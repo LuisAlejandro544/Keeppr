@@ -13,8 +13,11 @@ Plan de evolución técnica y funcional para la aplicación VaultNotes.
   - C++17 mediante CMake y JNI (`libvaultnotes_native.so`).
   - Rust mediante Cargo con soporte multiarquitectura: `arm64-v8a` (64 bits), `armeabi-v7a` (32 bits / Android Go) y `x86_64` (`libvaultnotes_rust.a`).
   - Motor C oficial de Lua 5.4.6 compilado estáticamente sin wrappers de terceros.
+- [x] Aceleración de procesamiento de notas y búsqueda en memoria nativa con Rust:
+  - Extracción en una pasada nativa de métricas, conteo de palabras y snippets Markdown limpios (`rust_process_note_summary`).
+  - Algoritmo de coincidencia y filtrado instantáneo en Rust (`rust_match_note`) coordinado con corrutinas de Kotlin en `Dispatchers.Default`.
 - [x] Diálogo interactivo en la UI para inspección de motores y ejecución dinámica de scripts Lua.
-- [x] Personalización tipográfica con 5 familias nativas del sistema Android (Predeterminada, Sans-Serif, Serif, Monoespaciada, Cursiva) con vista previa interactiva y persistencia offline.
+- [x] Personalización tipográfica granular con 5 familias nativas del sistema Android (Predeterminada, Sans-Serif, Serif, Monoespaciada, Cursiva) aplicables individualmente por nota o a fragmentos específicos de texto (inline con `[font:id]...[/font]`), con vista previa interactiva y persistencia en Room (migración v2).
 - [x] Script de mantenimiento automatizado `clean_native_artifacts.sh` para purgar carpetas `target`, `.cxx` y archivos residuales.
 - [x] Automatización CI con GitHub Actions (compilación limpia sin caché de APK Debug y soporte para sobrescritura de commits).
 - [x] Script autónomo `setup_debug_keystore.sh` para generación forzada y limpia del keystore debug sin dependencias externas.

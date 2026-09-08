@@ -16,6 +16,9 @@ extern "C" {
 char* rust_core_status();
 void rust_core_free_string(char* ptr);
 uint32_t rust_calculate_reading_time_secs(uint32_t word_count);
+uint32_t rust_count_words(const char* text);
+char* rust_process_note_summary(const char* content, uint32_t max_snippet_len);
+bool rust_match_note(const char* query, const char* title, const char* content, const char* tags);
 }
 
 extern "C" JNIEXPORT jstring JNICALL
@@ -94,3 +97,45 @@ Java_com_example_native_NativeEngine_calculateReadingTimeInRust(
         jint word_count) {
     return static_cast<jint>(rust_calculate_reading_time_secs(static_cast<uint32_t>(word_count)));
 }
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_example_native_NativeEngine_processNoteSummaryInRust(
+        JNIEnv* env,
+        jobject /* this */,
+        jstring content,
+        jint max_snippet_len) {
+    const char* nativeContent = content != nullptr ? env->GetStringUTFChars(content, nullptr) : "";
+    char* result = rust_process_note_summary(nativeContent, static_cast<uint32_t>(max_snippet_len));
+    if (content != nullptr) {
+        env->ReleaseStringUTFChars(content, nativeContent);
+    }
+    jstring jResult = env->NewStringUTF(result != nullptr ? result : "0|0|");
+    if (result != nullptr) {
+        rust_core_free_string(result);
+    }
+    return jResult;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_example_native_NativeEngine_matchNoteInRust(
+        JNIEnv* env,
+        jobject /* this */,
+        jstring query,
+        jstring title,
+        jstring content,
+        jstring tags) {
+    const char* nativeQuery = query != nullptr ? env->GetStringUTFChars(query, nullptr) : "";
+    const char* nativeTitle = title != nullptr ? env->GetStringUTFChars(title, nullptr) : "";
+    const char* nativeContent = content != nullptr ? env->GetStringUTFChars(content, nullptr) : "";
+    const char* nativeTags = tags != nullptr ? env->GetStringUTFChars(tags, nullptr) : "";
+
+    bool matched = rust_match_note(nativeQuery, nativeTitle, nativeContent, nativeTags);
+
+    if (query != nullptr) env->ReleaseStringUTFChars(query, nativeQuery);
+    if (title != nullptr) env->ReleaseStringUTFChars(title, nativeTitle);
+    if (content != nullptr) env->ReleaseStringUTFChars(content, nativeContent);
+    if (tags != nullptr) env->ReleaseStringUTFChars(tags, nativeTags);
+
+    return static_cast<jboolean>(matched);
+}
+

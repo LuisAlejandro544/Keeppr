@@ -1,5 +1,6 @@
 package com.example.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,14 +20,22 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.FormatSize
+import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,28 +43,33 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.ui.theme.AppFontTheme
 
 /**
- * Diálogo modal para la selección de la tipografía de VaultNotes.
+ * Diálogo modal para la selección de tipografía en VaultNotes.
  *
- * Presenta las 5 opciones tipográficas (Predeterminada, Sans-Serif, Serif, Monoespaciada y Cursiva).
- * Cada opción visualiza en tiempo real cómo se renderiza el texto con esa familia de fuentes.
- *
- * @param currentFont Tipografía actualmente activa.
- * @param onFontSelected Callback invocado al elegir una nueva tipografía.
- * @param onDismissRequest Callback invocado al solicitar el cierre del diálogo.
+ * Permite al usuario elegir entre 5 estilos tipográficos (Predeterminada, Sans-Serif,
+ * Serif, Monoespaciada y Cursiva) y definir el alcance del cambio:
+ * 1. Aplicar a toda la nota (establece la tipografía base de la nota actual).
+ * 2. Aplicar al texto seleccionado o fragmento (inserta o envuelve con etiquetas [font:id]...[/font]).
  */
 @Composable
 fun FontSelectionDialog(
     currentFont: AppFontTheme,
-    onFontSelected: (AppFontTheme) -> Unit,
+    hasSelection: Boolean = false,
+    selectedTextSnippet: String = "",
+    onApplyToWholeNote: (AppFontTheme) -> Unit,
+    onApplyToSelection: (AppFontTheme) -> Unit,
     onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // Si hay texto seleccionado, por defecto seleccionamos el modo de fragmento
+    var applyToWholeNote by remember { mutableStateOf(!hasSelection) }
+
     AlertDialog(
         onDismissRequest = onDismissRequest,
         modifier = modifier.testTag("font_selection_dialog"),
@@ -95,11 +109,90 @@ fun FontSelectionDialog(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                Spacer(modifier = Modifier.height(4.dp))
+                // Selector de alcance: Toda la nota vs Texto seleccionado
+                Text(
+                    text = "Alcance de la tipografía:",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        selected = applyToWholeNote,
+                        onClick = { applyToWholeNote = true },
+                        label = { Text(stringResource(R.string.font_scope_whole_note), fontSize = 12.sp) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Description,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("font_scope_whole_note"),
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    )
+
+                    FilterChip(
+                        selected = !applyToWholeNote,
+                        onClick = { applyToWholeNote = false },
+                        label = { Text(stringResource(R.string.font_scope_selection), fontSize = 12.sp) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.TextFields,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("font_scope_selection"),
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    )
+                }
+
+                // Indicador contextual para texto seleccionado
+                AnimatedVisibility(visible = !applyToWholeNote) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = if (hasSelection && selectedTextSnippet.isNotBlank()) {
+                                    "Aplicará a: \"$selectedTextSnippet\""
+                                } else {
+                                    "Se insertará etiqueta en la posición del cursor"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(2.dp))
 
                 // Renderizado de las 5 opciones de tipografía
                 AppFontTheme.entries.forEach { fontOption ->
-                    val isSelected = fontOption == currentFont
+                    val isSelected = applyToWholeNote && (fontOption == currentFont)
 
                     Surface(
                         modifier = Modifier
@@ -112,7 +205,12 @@ fun FontSelectionDialog(
                                 shape = RoundedCornerShape(12.dp)
                             )
                             .clickable {
-                                onFontSelected(fontOption)
+                                if (applyToWholeNote) {
+                                    onApplyToWholeNote(fontOption)
+                                } else {
+                                    onApplyToSelection(fontOption)
+                                }
+                                onDismissRequest()
                             }
                             .testTag("font_option_${fontOption.id}"),
                         color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
@@ -125,7 +223,7 @@ fun FontSelectionDialog(
                                 .padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Indicador visual de selección (Círculo con Check)
+                            // Indicador visual de selección
                             Box(
                                 modifier = Modifier
                                     .size(22.dp)
@@ -153,7 +251,7 @@ fun FontSelectionDialog(
 
                             Spacer(modifier = Modifier.width(12.dp))
 
-                            // Información y muestra de la tipografía con su propia familia de fuentes
+                            // Información y muestra de la tipografía
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = fontOption.displayName,
@@ -173,7 +271,6 @@ fun FontSelectionDialog(
 
                                 Spacer(modifier = Modifier.height(4.dp))
 
-                                // Texto de muestra usando la tipografía específica
                                 Text(
                                     text = fontOption.previewSample,
                                     fontFamily = fontOption.fontFamily,
@@ -201,3 +298,4 @@ fun FontSelectionDialog(
         }
     )
 }
+

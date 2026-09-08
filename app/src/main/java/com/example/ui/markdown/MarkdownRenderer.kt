@@ -55,6 +55,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.theme.AppFontTheme
 import com.example.ui.theme.CalloutAmberBg
 import com.example.ui.theme.CalloutAmberBorder
 import com.example.ui.theme.CalloutBlueBg
@@ -68,9 +69,11 @@ import kotlinx.coroutines.launch
 fun MarkdownPreview(
     content: String,
     onToggleTask: (lineIndex: Int) -> Unit,
+    baseFontTheme: AppFontTheme = AppFontTheme.DEFAULT,
     modifier: Modifier = Modifier
 ) {
     val blocks = remember(content) { MarkdownParser.parse(content) }
+    val baseFontFamily = baseFontTheme.fontFamily
 
     Column(
         modifier = modifier
@@ -81,7 +84,7 @@ fun MarkdownPreview(
         if (blocks.isEmpty()) {
             Text(
                 text = "Sin contenido para previsualizar.",
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodyMedium.copy(fontFamily = baseFontFamily),
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                 modifier = Modifier.padding(16.dp)
             )
@@ -89,33 +92,36 @@ fun MarkdownPreview(
 
         blocks.forEach { block ->
             when (block) {
-                is MarkdownBlock.Header -> RenderHeader(block)
-                is MarkdownBlock.Callout -> RenderCallout(block)
-                is MarkdownBlock.TaskItem -> RenderTaskItem(block, onToggleTask)
-                is MarkdownBlock.BulletItem -> RenderBulletItem(block)
-                is MarkdownBlock.NumberedItem -> RenderNumberedItem(block)
-                is MarkdownBlock.Quote -> RenderQuote(block)
+                is MarkdownBlock.Header -> RenderHeader(block, baseFontFamily)
+                is MarkdownBlock.Callout -> RenderCallout(block, baseFontFamily)
+                is MarkdownBlock.TaskItem -> RenderTaskItem(block, baseFontFamily, onToggleTask)
+                is MarkdownBlock.BulletItem -> RenderBulletItem(block, baseFontFamily)
+                is MarkdownBlock.NumberedItem -> RenderNumberedItem(block, baseFontFamily)
+                is MarkdownBlock.Quote -> RenderQuote(block, baseFontFamily)
                 is MarkdownBlock.CodeBlock -> RenderCodeBlock(block)
                 is MarkdownBlock.Divider -> RenderDivider()
-                is MarkdownBlock.Paragraph -> RenderParagraph(block)
+                is MarkdownBlock.Paragraph -> RenderParagraph(block, baseFontFamily)
             }
         }
     }
 }
 
 @Composable
-private fun RenderHeader(header: MarkdownBlock.Header) {
+private fun RenderHeader(header: MarkdownBlock.Header, baseFontFamily: FontFamily) {
     val (style, topPadding) = when (header.level) {
         1 -> MaterialTheme.typography.headlineMedium.copy(
             fontWeight = FontWeight.Bold,
+            fontFamily = baseFontFamily,
             color = MaterialTheme.colorScheme.onSurface
         ) to 12.dp
         2 -> MaterialTheme.typography.titleLarge.copy(
             fontWeight = FontWeight.SemiBold,
+            fontFamily = baseFontFamily,
             color = MaterialTheme.colorScheme.onSurface
         ) to 10.dp
         else -> MaterialTheme.typography.titleMedium.copy(
             fontWeight = FontWeight.SemiBold,
+            fontFamily = baseFontFamily,
             color = MaterialTheme.colorScheme.primary
         ) to 6.dp
     }
@@ -136,7 +142,7 @@ private fun RenderHeader(header: MarkdownBlock.Header) {
 }
 
 @Composable
-private fun RenderCallout(callout: MarkdownBlock.Callout) {
+private fun RenderCallout(callout: MarkdownBlock.Callout, baseFontFamily: FontFamily) {
     val (bgColor, borderColor, icon) = when (callout.type) {
         CalloutType.NOTE, CalloutType.INFO -> Triple(
             CalloutBlueBg,
@@ -185,6 +191,7 @@ private fun RenderCallout(callout: MarkdownBlock.Callout) {
                     text = callout.title,
                     style = MaterialTheme.typography.labelLarge.copy(
                         fontWeight = FontWeight.Bold,
+                        fontFamily = baseFontFamily,
                         color = borderColor
                     )
                 )
@@ -193,6 +200,7 @@ private fun RenderCallout(callout: MarkdownBlock.Callout) {
                     Text(
                         text = formatInlineMarkdown(callout.content),
                         style = MaterialTheme.typography.bodyMedium.copy(
+                            fontFamily = baseFontFamily,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                     )
@@ -205,6 +213,7 @@ private fun RenderCallout(callout: MarkdownBlock.Callout) {
 @Composable
 private fun RenderTaskItem(
     item: MarkdownBlock.TaskItem,
+    baseFontFamily: FontFamily,
     onToggle: (lineIndex: Int) -> Unit
 ) {
     Row(
@@ -227,6 +236,7 @@ private fun RenderTaskItem(
         Text(
             text = formatInlineMarkdown(item.text),
             style = MaterialTheme.typography.bodyMedium.copy(
+                fontFamily = baseFontFamily,
                 textDecoration = if (item.checked) TextDecoration.LineThrough else TextDecoration.None,
                 color = if (item.checked) {
                     MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
@@ -239,7 +249,7 @@ private fun RenderTaskItem(
 }
 
 @Composable
-private fun RenderBulletItem(item: MarkdownBlock.BulletItem) {
+private fun RenderBulletItem(item: MarkdownBlock.BulletItem, baseFontFamily: FontFamily) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -256,6 +266,7 @@ private fun RenderBulletItem(item: MarkdownBlock.BulletItem) {
         Text(
             text = formatInlineMarkdown(item.text),
             style = MaterialTheme.typography.bodyMedium.copy(
+                fontFamily = baseFontFamily,
                 color = MaterialTheme.colorScheme.onSurface
             )
         )
@@ -263,7 +274,7 @@ private fun RenderBulletItem(item: MarkdownBlock.BulletItem) {
 }
 
 @Composable
-private fun RenderNumberedItem(item: MarkdownBlock.NumberedItem) {
+private fun RenderNumberedItem(item: MarkdownBlock.NumberedItem, baseFontFamily: FontFamily) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -274,6 +285,7 @@ private fun RenderNumberedItem(item: MarkdownBlock.NumberedItem) {
             text = "${item.number}.",
             style = MaterialTheme.typography.bodyMedium.copy(
                 fontWeight = FontWeight.Bold,
+                fontFamily = baseFontFamily,
                 color = MaterialTheme.colorScheme.primary
             ),
             modifier = Modifier.width(24.dp)
@@ -281,6 +293,7 @@ private fun RenderNumberedItem(item: MarkdownBlock.NumberedItem) {
         Text(
             text = formatInlineMarkdown(item.text),
             style = MaterialTheme.typography.bodyMedium.copy(
+                fontFamily = baseFontFamily,
                 color = MaterialTheme.colorScheme.onSurface
             )
         )
@@ -288,7 +301,7 @@ private fun RenderNumberedItem(item: MarkdownBlock.NumberedItem) {
 }
 
 @Composable
-private fun RenderQuote(quote: MarkdownBlock.Quote) {
+private fun RenderQuote(quote: MarkdownBlock.Quote, baseFontFamily: FontFamily) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -307,6 +320,7 @@ private fun RenderQuote(quote: MarkdownBlock.Quote) {
         Text(
             text = formatInlineMarkdown(quote.text),
             style = MaterialTheme.typography.bodyMedium.copy(
+                fontFamily = baseFontFamily,
                 fontStyle = FontStyle.Italic,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
             )
@@ -387,10 +401,11 @@ private fun RenderDivider() {
 }
 
 @Composable
-private fun RenderParagraph(paragraph: MarkdownBlock.Paragraph) {
+private fun RenderParagraph(paragraph: MarkdownBlock.Paragraph, baseFontFamily: FontFamily) {
     Text(
         text = formatInlineMarkdown(paragraph.text),
         style = MaterialTheme.typography.bodyMedium.copy(
+            fontFamily = baseFontFamily,
             lineHeight = 22.sp,
             color = MaterialTheme.colorScheme.onSurface
         )
@@ -398,7 +413,7 @@ private fun RenderParagraph(paragraph: MarkdownBlock.Paragraph) {
 }
 
 /**
- * Parses inline markdown: **bold**, *italic*, `code`, ~~strike~~, #tags
+ * Parses inline markdown: **bold**, *italic*, `code`, ~~strike~~, [font:id]...[/font], #tags
  */
 @Composable
 fun formatInlineMarkdown(rawText: String): AnnotatedString {
@@ -413,6 +428,24 @@ fun formatInlineMarkdown(rawText: String): AnnotatedString {
 
             while (i < len) {
                 when {
+                    // Inline custom font tags: [font:serif]text[/font]
+                    rawText.startsWith("[font:", i) && rawText.indexOf(']', i) != -1 && rawText.indexOf("[/font]", i) != -1 -> {
+                        val closeBracket = rawText.indexOf(']', i)
+                        val endTag = rawText.indexOf("[/font]", closeBracket + 1)
+                        if (closeBracket != -1 && endTag != -1) {
+                            val fontId = rawText.substring(i + 6, closeBracket).trim()
+                            val fontTarget = AppFontTheme.fromId(fontId)
+                            val innerText = rawText.substring(closeBracket + 1, endTag)
+                            pushStyle(SpanStyle(fontFamily = fontTarget.fontFamily))
+                            append(innerText)
+                            pop()
+                            i = endTag + 7
+                        } else {
+                            append(rawText[i])
+                            i++
+                        }
+                    }
+
                     // Inline code `code`
                     rawText[i] == '`' && rawText.indexOf('`', i + 1) != -1 -> {
                         val end = rawText.indexOf('`', i + 1)

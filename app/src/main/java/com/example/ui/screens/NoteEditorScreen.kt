@@ -100,7 +100,6 @@ import java.util.Locale
 fun NoteEditorScreen(
     note: Note,
     editorMode: EditorMode,
-    selectedFont: AppFontTheme = AppFontTheme.DEFAULT,
     onTitleChange: (String) -> Unit,
     onContentChange: (String) -> Unit,
     onIconChange: (String) -> Unit,
@@ -108,11 +107,12 @@ fun NoteEditorScreen(
     onTogglePin: () -> Unit,
     onToggleTask: (lineIndex: Int) -> Unit,
     onModeChange: (EditorMode) -> Unit,
-    onFontSelected: (AppFontTheme) -> Unit = {},
+    onNoteFontChange: (String) -> Unit = {},
     onDeleteNote: () -> Unit,
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val noteFont = remember(note.fontTheme) { AppFontTheme.fromId(note.fontTheme) }
     var showEmojiPicker by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showTagsEditor by remember { mutableStateOf(false) }
@@ -288,6 +288,7 @@ fun NoteEditorScreen(
                             bringIntoViewRequester.bringIntoView()
                         }
                     },
+                    onOpenFontDialog = { showFontDialog = true },
                     modifier = Modifier.testTag("editor_markdown_toolbar")
                 )
             }
@@ -428,10 +429,10 @@ fun NoteEditorScreen(
                     TextField(
                         value = contentFieldValue,
                         onValueChange = { newValue ->
+                            val textChanged = contentFieldValue.text != newValue.text
                             contentFieldValue = newValue
-                            onContentChange(newValue.text)
-                            coroutineScope.launch {
-                                bringIntoViewRequester.bringIntoView()
+                            if (textChanged) {
+                                onContentChange(newValue.text)
                             }
                         },
                         modifier = Modifier
@@ -442,7 +443,7 @@ fun NoteEditorScreen(
                                 isContentFocused = focusState.isFocused
                                 if (focusState.isFocused) {
                                     coroutineScope.launch {
-                                        delay(150)
+                                        delay(200)
                                         bringIntoViewRequester.bringIntoView()
                                     }
                                 }
@@ -466,7 +467,7 @@ fun NoteEditorScreen(
                         textStyle = MaterialTheme.typography.bodyLarge.copy(
                             fontSize = 15.sp,
                             lineHeight = 22.sp,
-                            fontFamily = selectedFont.fontFamily,
+                            fontFamily = noteFont.fontFamily,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                     )
@@ -482,6 +483,7 @@ fun NoteEditorScreen(
                     ) {
                         MarkdownPreview(
                             content = note.content,
+                            baseFontTheme = noteFont,
                             onToggleTask = onToggleTask
                         )
                         Spacer(modifier = Modifier.height(48.dp))
@@ -529,12 +531,43 @@ fun NoteEditorScreen(
         )
     }
 
-    // Diálogo para seleccionar una de las 5 tipografías disponibles
+    // Diálogo para seleccionar tipografía (Toda la nota vs Texto seleccionado)
     if (showFontDialog) {
+        val selection = contentFieldValue.selection
+        val hasSelection = selection.start != selection.end
+        val selectedSnippet = if (hasSelection) {
+            val s = selection.start
+            val e = selection.end
+            val sub = contentFieldValue.text.substring(s, e)
+            if (sub.length > 25) sub.take(25) + "…" else sub
+        } else ""
+
         FontSelectionDialog(
-            currentFont = selectedFont,
-            onFontSelected = { newFont ->
-                onFontSelected(newFont)
+            currentFont = noteFont,
+            hasSelection = hasSelection,
+            selectedTextSnippet = selectedSnippet,
+            onApplyToWholeNote = { newFont ->
+                onNoteFontChange(newFont.id)
+            },
+            onApplyToSelection = { newFont ->
+                val text = contentFieldValue.text
+                val sel = contentFieldValue.selection
+                val start = sel.start
+                val end = sel.end
+                val prefix = "[font:${newFont.id}]"
+                val suffix = "[/font]"
+                val textToWrap = if (start != end) text.substring(start, end) else "texto"
+                val newText = text.substring(0, start) + prefix + textToWrap + suffix + text.substring(end)
+                val newCursorPos = start + prefix.length + textToWrap.length + suffix.length
+
+                contentFieldValue = TextFieldValue(
+                    text = newText,
+                    selection = TextRange(newCursorPos)
+                )
+                onContentChange(newText)
+                coroutineScope.launch {
+                    bringIntoViewRequester.bringIntoView()
+                }
             },
             onDismissRequest = { showFontDialog = false }
         )

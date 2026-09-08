@@ -1,27 +1,15 @@
-feat: soporte para dispositivos de 32 bits (armeabi-v7a / Android Go) y automatización CI
+feat/refactor: personalización de tipografía por nota y por fragmento de texto (inline) en lugar de ajuste global
 
-- Añadido soporte nativo para arquitecturas de 32 bits (`armeabi-v7a`) en Gradle, CMake y Rust (`armv7-linux-androideabi`), permitiendo compatibilidad total con dispositivos de entrada y ediciones Android Go.
-- Creado script `setup_debug_keystore.sh` para forzar la generación limpia y autónoma de `debug.keystore` desde cero con keytool estándar, garantizando compilaciones 100% funcionales en CI y local.
-- Creado workflow de GitHub Actions `build-debug.yml` para compilar el APK Debug completo (Kotlin + C++ + Rust + Lua) sin caché, instalando toolchains nativos y subiendo el artefacto terminado.
-- Creado workflow de GitHub Actions `override-commit-message.yml` para reescritura automática de mensajes de commit a partir de `commit_message.txt`.
-- Actualizada la documentación técnica del proyecto en README.md, STRUCTURE.md, AI_CONTEXT.md y ROADMAP.md.
-
-perf/fix: optimización de corrutinas, insets de navegación por botones y experiencia de edición
-
-- Solucionado el solapamiento de la barra de herramientas Markdown con la navegación tradicional por 3 botones mediante `navigationBarsPadding()` en `MarkdownToolbar`.
-- Implementada la visibilidad condicional de la barra de herramientas: permanece oculta al visualizar la nota y aparece automáticamente solo al enfocar un campo de edición con teclado activo.
-- Añadido auto-desplazamiento suave de la vista hacia el cursor (`BringIntoViewRequester`) al pulsar en zonas inferiores de la nota o al desplegarse el teclado.
-- Optimizado el rendimiento del editor y listas con corrutinas en segundo plano: guardado asíncrono con debounce (500ms) en `Dispatchers.IO` para evitar escrituras SQLite redundantes por cada pulsación de tecla.
-- Desplazado el filtrado de notas y agregación de etiquetas a `Dispatchers.Default` (`flowOn`) para liberar por completo el hilo principal de la interfaz de usuario.
-- Optimizado el conteo de palabras en `Note.kt` con un algoritmo de pase lineal O(N) sin asignación de expresiones regulares.
-- Fijada la escala tipográfica predeterminada a 1.0x (`fontScale = 1.0f`) en `Theme.kt` mediante `CompositionLocalProvider(LocalDensity)`, garantizando proporciones de texto estables e impidiendo desbordes visuales por configuraciones externas del sistema.
-
-feat: selector de 5 tipografías nativas y modelo de desarrollo guiado por la comunidad
-
-- Implementada la selección entre 5 tipografías del sistema Android (Predeterminada/Sistema, Sans-Serif Moderna, Serif Clásica/Editorial, Monoespaciada/Código y Cursiva Manuscrita) en `AppFontTheme` (`Type.kt`).
-- Creado el diálogo interactivo `FontSelectionDialog.kt` con previsualización en vivo de cada estilo tipográfico y diseño táctil adaptativo M3.
-- Integrado el selector de tipografía tanto en la barra superior de la pantalla principal (`NotesListScreen`) como en la barra de herramientas del editor de notas (`NoteEditorScreen`), aplicando la tipografía inmediatamente al área de escritura y a toda la interfaz mediante `MyApplicationTheme`.
-- Añadida persistencia local en `NotesViewModel` usando `SharedPreferences` (`vaultnotes_prefs`) para recordar la tipografía elegida por el usuario entre reinicios sin requerir conexión a internet ni librerías invasivas.
-- Actualizados los archivos de documentación (`README.md`, `ROADMAP.md`, `STRUCTURE.md`, `AI_CONTEXT.md`) incorporando la filosofía anti-bloat: el desarrollo de nuevas funciones estará guiado por las propuestas y votaciones de la comunidad para evitar sobrecargar la app con características innecesarias.
+- Migrado el selector de tipografías desde un estado global en SharedPreferences hacia un modelo granular por nota y por fragmentos de texto seleccionados:
+  * Entidad `Note` actualizada con el campo `fontTheme` y migración de base de datos Room (`MIGRATION_1_2` en `AppDatabase.kt` a versión 2).
+  * Diálogo `FontSelectionDialog` adaptado con selector de alcance dual: "Toda la nota" (actualiza la tipografía base de la nota activa) y "Texto seleccionado" (envuelve o inserta la etiqueta `[font:id]...[/font]` en la posición del cursor).
+  * Renderizador `MarkdownRenderer.kt` enriquecido con soporte para etiquetas `[font:id]...[/font]`, permitiendo combinar múltiples estilos tipográficos (Serif, Sans, Mono, Cursiva, Predeterminada) en una misma nota en vista previa interactiva.
+  * Agregado botón "Aa Fuente" en `MarkdownToolbar.kt` para acceso directo y ergonómico desde pantallas móviles.
+  * Tarjetas de notas en `NotesListScreen.kt` renderizan su título y extracto con la tipografía asignada individualmente a cada nota.
+- Mantenidas las correcciones previas de rendimiento y estabilidad:
+  * Corregido el targetState en `AnimatedContent` de `MainActivity.kt`: conmuta según `(activeNote != null)` para prevenir el desmontaje de la pantalla, transiciones innecesarias y el cierre forzado del teclado virtual (IME).
+  * Desacoplado el scroll forzado en `onValueChange` en `NoteEditorScreen.kt` y sincronizado al ViewModel únicamente cuando el texto cambia de manera efectiva.
+  * Optimizada la lista de notas (`NotesListScreen.kt`) memorizando la partición de notas fijadas y métricas por tarjeta.
+  * Integración de Rust nativo (`lib.rs`, `native-bridge.cpp`, `NativeEngine.kt`) para cálculo en una sola pasada de resúmenes de Markdown (`rust_process_note_summary`) y búsqueda insensible a mayúsculas (`rust_match_note`).
 
 

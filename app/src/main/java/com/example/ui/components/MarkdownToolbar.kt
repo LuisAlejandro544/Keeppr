@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun MarkdownToolbar(
     onInsertText: (prefix: String, suffix: String) -> Unit,
+    onOpenFontDialog: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -47,6 +48,9 @@ fun MarkdownToolbar(
             ToolbarButton(label = "H3", testTag = "toolbar_h3") { onInsertText("\n### ", "") }
             ToolbarButton(label = "B", isBold = true, testTag = "toolbar_bold") { onInsertText("**", "**") }
             ToolbarButton(label = "I", isItalic = true, testTag = "toolbar_italic") { onInsertText("*", "*") }
+            if (onOpenFontDialog != null) {
+                ToolbarButton(label = "Aa Fuente", testTag = "toolbar_font") { onOpenFontDialog() }
+            }
             ToolbarButton(label = "☑ Tarea", testTag = "toolbar_task") { onInsertText("\n- [ ] ", "") }
             ToolbarButton(label = "• Lista", testTag = "toolbar_bullet") { onInsertText("\n- ", "") }
             ToolbarButton(label = "1. Num", testTag = "toolbar_num") { onInsertText("\n1. ", "") }

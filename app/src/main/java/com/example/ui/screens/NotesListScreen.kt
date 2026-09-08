@@ -276,14 +276,15 @@ fun NotesListScreen(
                     onCreateClick = onCreateNoteClick
                 )
             } else {
+                // Partition notes into pinned and regular using remember to avoid recomputation on scroll
+                val pinnedNotes = remember(notes) { notes.filter { it.isPinned } }
+                val regularNotes = remember(notes) { notes.filter { !it.isPinned } }
+
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    val pinnedNotes = notes.filter { it.isPinned }
-                    val regularNotes = notes.filter { !it.isPinned }
-
                     if (pinnedNotes.isNotEmpty()) {
                         item {
                             SectionHeader(title = "Fijadas 📌", count = pinnedNotes.size)
@@ -458,7 +459,11 @@ fun NotesListScreen(
     if (showFontDialog) {
         FontSelectionDialog(
             currentFont = selectedFont,
-            onFontSelected = { newFont ->
+            hasSelection = false,
+            onApplyToWholeNote = { newFont ->
+                onFontSelected(newFont)
+            },
+            onApplyToSelection = { newFont ->
                 onFontSelected(newFont)
             },
             onDismissRequest = { showFontDialog = false }
@@ -512,25 +517,13 @@ private fun NoteCard(
     }
 
     val displayTitle = note.title.ifBlank { "Nota sin título" }
+    val noteFont = remember(note.fontTheme) { AppFontTheme.fromId(note.fontTheme) }
 
-    // Strip markdown formatting for the preview snippet
-    val cleanSnippet = remember(note.content) {
-        note.content
-            .lines()
-            .map { line ->
-                line.removePrefix("#")
-                    .removePrefix("##")
-                    .removePrefix("###")
-                    .removePrefix("- [ ]")
-                    .removePrefix("- [x]")
-                    .removePrefix("- ")
-                    .removePrefix(">")
-                    .trim()
-            }
-            .filter { it.isNotBlank() && !it.startsWith("---") }
-            .take(3)
-            .joinToString(" ")
+    // Procesa extracto de Markdown y conteo métrico en una sola pasada nativa mediante Rust
+    val noteSummary = remember(note.content) {
+        NativeEngine.processNoteSummary(note.content, maxSnippetLen = 120)
     }
+    val cleanSnippet = noteSummary.snippet
 
     ElevatedCard(
         modifier = Modifier
@@ -566,6 +559,7 @@ private fun NoteCard(
                     text = displayTitle,
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold,
+                        fontFamily = noteFont.fontFamily,
                         color = MaterialTheme.colorScheme.onSurface
                     ),
                     maxLines = 1,
@@ -588,6 +582,7 @@ private fun NoteCard(
                 Text(
                     text = cleanSnippet,
                     style = MaterialTheme.typography.bodySmall.copy(
+                        fontFamily = noteFont.fontFamily,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         lineHeight = 18.sp
                     ),
@@ -599,17 +594,20 @@ private fun NoteCard(
             Spacer(modifier = Modifier.height(8.dp))
 
             // Footer row: tags and date
+            val tagList = remember(note.tags) { note.tagList }
+            val wordCount = noteSummary.wordCount
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (note.tagList.isNotEmpty()) {
+                if (tagList.isNotEmpty()) {
                     FlowRow(
                         modifier = Modifier.weight(1f, fill = false),
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        note.tagList.take(3).forEach { tag ->
+                        tagList.take(3).forEach { tag ->
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(6.dp))
@@ -631,7 +629,7 @@ private fun NoteCard(
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "$formattedDate • ${note.wordCount} pal.",
+                        text = "$formattedDate • $wordCount pal.",
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                     )

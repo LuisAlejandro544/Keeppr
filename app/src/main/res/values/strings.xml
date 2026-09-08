@@ -19,7 +19,10 @@
     <string name="tags_label">Etiquetas</string>
     <string name="words_count">%d palabras</string>
     <string name="character_count">%d caracteres</string>
-    <string name="select_typography">Tipografía de lectura y notas</string>
-    <string name="select_typography_desc">Elige entre 5 estilos de letra optimizados para lectura y edición offline.</string>
+    <string name="select_typography">Tipografía de la nota</string>
+    <string name="select_typography_desc">Elige entre 5 estilos de letra para toda la nota o solo para el texto seleccionado.</string>
+    <string name="font_scope_whole_note">Toda la nota</string>
+    <string name="font_scope_selection">Texto seleccionado</string>
+    <string name="font_scope_desc">Define si deseas aplicar la tipografía a la nota completa o envolver la selección actual con etiquetas de estilo.</string>
     <string name="close">Cerrar</string>
 </resources>

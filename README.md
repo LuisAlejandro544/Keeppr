@@ -49,10 +49,13 @@ gradle :app:testDebugUnitTest
    - Almacenamiento fuera de línea garantizado sin depender de servicios en la nube privativos.
    - Búsqueda en tiempo real por texto, etiquetas y categorías.
    - Fijado de notas prioritarias y conteo automático de palabras y caracteres.
+   - Guardado individual de la tipografía base por nota (`fontTheme`) con migración automática de base de datos a versión 2.
 
-2. **Núcleo de Cómputo en Rust:**
-   - Criptografía y operaciones de hashing en bajo nivel compiladas como librería estática nativa (`libvaultnotes_rust.a`).
-   - Interfaz C FFI (`extern "C"`) de cero coste de abstracción.
+2. **Núcleo de Cómputo y Aceleración en Rust:**
+   - Criptografía, operaciones de hashing y procesamiento de texto en bajo nivel compiladas como librería estática nativa (`libvaultnotes_rust.a`).
+   - Aceleración nativa de carga y renderizado de notas: extracción de extractos limpios de Markdown (`snippet`), cálculo de métricas y tiempo de lectura en una sola pasada en memoria nativa (`rust_process_note_summary`).
+   - Algoritmo de búsqueda rápida insensible a mayúsculas y acentos (`rust_match_note`) ejecutado en memoria nativa y coordinado con corrutinas reactivas en Kotlin (`Dispatchers.Default`).
+   - Interfaz C FFI (`extern "C"`) de cero coste de abstracción y compatible con 64 bits (`arm64-v8a`, `x86_64`) y 32 bits (`armeabi-v7a`).
 
 3. **Intérprete C Oficial de Lua 5.4.6:**
    - Motor oficial de Lua compilado en C11 estático.
@@ -61,10 +64,14 @@ gradle :app:testDebugUnitTest
 4. **Puente JNI en C++17:**
    - Enlace bidireccional entre la JVM/ART de Kotlin y las librerías nativas con manejo de excepciones y validación de tipos JNI.
 
-5. **Personalización Tipográfica (5 Estilos Offline):**
-   - Selector interactivo accesible en la lista principal y en el editor de notas con previsualización en vivo.
+5. **Personalización Tipográfica Granular (Por Nota y por Fragmento Inline):**
+   - Selector interactivo accesible en el editor de notas y en la barra de herramientas (`MarkdownToolbar` con botón "Aa Fuente") con previsualización en tiempo real.
+   - **Sin imposición global:** La tipografía no altera toda la aplicación de manera global; se aplica a nivel individual por nota o a fragmentos específicos de texto.
+   - **Alcance dual:**
+     * **Toda la nota:** Configura la familia tipográfica base de la nota activa (almacenada en Room y reflejada en su tarjeta de lista y editor).
+     * **Texto seleccionado / Fragmento:** Envuelve o inserta etiquetas de formato `[font:id]...[/font]`, permitiendo combinar múltiples tipografías dentro del mismo documento Markdown.
    - 5 familias tipográficas nativas de Android: *Predeterminada (Sistema)*, *Sans-Serif Moderna*, *Serif Clásica (Editorial)*, *Monoespaciada (Código)* y *Cursiva Manuscrita*.
-   - Persistencia automática de la preferencia sin requerir conectividad de red ni servicios externos.
+   - Persistencia 100% offline sin dependencias de red ni servicios externos.
 
 6. **Distribución Autónoma:**
    - Preparado para tiendas de aplicaciones de terceros (Uptodown, F-Droid, APK directo) cumpliendo con políticas de privacidad e integridad del sistema.

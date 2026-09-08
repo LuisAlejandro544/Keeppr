@@ -29,11 +29,11 @@ Este documento detalla el árbol de directorios, la organización de módulos y 
 │       │   │   ├── NotesApplication.kt    # Clase Application que inicializa la base de datos Room
 │       │   │   ├── data/                  # Capa de Persistencia Local (Room)
 │       │   │   │   ├── database/
-│       │   │   │   │   └── AppDatabase.kt # Base de datos Room con migraciones y acceso a DAOs
+│       │   │   │   │   └── AppDatabase.kt # Base de datos Room v2 (migración MIGRATION_1_2 para fontTheme) y DAOs
 │       │   │   │   ├── dao/
 │       │   │   │   │   └── NoteDao.kt     # Operaciones CRUD y consultas reactivas con Flow
 │       │   │   │   ├── model/
-│       │   │   │   │   └── Note.kt        # Entidad Note (id, título, contenido, etiquetas, fecha, fijado)
+│       │   │   │   │   └── Note.kt        # Entidad Note (id, título, contenido, etiquetas, fecha, fijado, fontTheme)
 │       │   │   │   └── repository/
 │       │   │   │       └── NoteRepository.kt # Abstracción del acceso a datos
 │       │   │   ├── native/
@@ -41,20 +41,20 @@ Este documento detalla el árbol de directorios, la organización de módulos y 
 │       │   │   ├── ui/                    # Capa de Presentación (Jetpack Compose)
 │       │   │   │   ├── components/
 │       │   │   │   │   ├── EmojiPickerDialog.kt    # Selector de iconos/emojis para notas
-│       │   │   │   │   ├── MarkdownToolbar.kt      # Barra de herramientas Markdown móvil
-│       │   │   │   │   └── FontSelectionDialog.kt  # Selector interactivo de las 5 tipografías del sistema
+│       │   │   │   │   ├── MarkdownToolbar.kt      # Barra de herramientas Markdown móvil (con botón 'Aa Fuente')
+│       │   │   │   │   └── FontSelectionDialog.kt  # Selector de tipografías con alcance dual (toda la nota vs selección)
 │       │   │   │   ├── markdown/
 │       │   │   │   │   ├── MarkdownParser.kt       # Parser offline de bloques y checkboxes estilo Notion
-│       │   │   │   │   └── MarkdownPreview.kt      # Renderizado interactivo de notas enriquecidas
+│       │   │   │   │   └── MarkdownPreview.kt      # Renderizado interactivo con fuentes base y etiquetas [font:id]
 │       │   │   │   ├── navigation/
 │       │   │   │   │   └── AppNavigation.kt # Grafo de navegación y rutas de pantalla
 │       │   │   │   ├── screens/
-│       │   │   │   │   ├── NotesListScreen.kt  # Pantalla principal: lista, búsqueda, tipografías y motor nativo
-│       │   │   │   │   └── NoteEditorScreen.kt # Editor de notas con formato, tipografía en vivo y etiquetas
+│       │   │   │   │   ├── NotesListScreen.kt  # Pantalla principal: lista (tarjetas con fuente por nota), búsqueda y motor
+│       │   │   │   │   └── NoteEditorScreen.kt # Editor con soporte de tipografía por nota y etiquetas de fragmento
 │       │   │   │   ├── theme/
-│       │   │   │   │   ├── Color.kt, Theme.kt, Type.kt # Paleta M3 y sistema tipográfico dinámico (5 estilos)
+│       │   │   │   │   ├── Color.kt, Theme.kt, Type.kt # Paleta M3 y definiciones de AppFontTheme (5 familias de fuentes)
 │       │   │   │   └── viewmodel/
-│       │   │   │       └── NotesViewModel.kt   # ViewModel para gestión reactiva de notas y tipografía elegida
+│       │   │   │       └── NotesViewModel.kt   # ViewModel para gestión reactiva de notas y tipografía por nota
 │       │   └── res/                       # Recursos Android
 │       │       ├── values/                # strings.xml, colors.xml, themes.xml
 │       │       ├── mipmap-*/              # Iconos adaptativos de la aplicación
@@ -83,7 +83,7 @@ Este documento detalla el árbol de directorios, la organización de módulos y 
 ### 1. Capa Nativa (`app/src/main/cpp` y `app/src/main/rust`)
 - **`CMakeLists.txt`**: Orquesta la compilación cruzada para las arquitecturas `arm64-v8a` (64 bits), `armeabi-v7a` (32 bits / Android Go) y `x86_64` (emuladores). Compila el código oficial de Lua 5.4.6 como librería estática en C11 (`liblua_static.a`) y enlaza el runtime de Rust precompilado por la tarea `cargoBuild` de Gradle.
 - **`native-bridge.cpp`**: Punto de contacto JNI (`Java_com_example_native_NativeEngine_*`). Inicializa y destruye estados de Lua (`lua_State`), evalúa scripts de usuario capturando salidas con `lua_pcall`, e invoca las funciones exportadas por Rust.
-- **`lib.rs` (Rust)**: Funciones seguras de cálculo, hashing y criptografía expuestas con firmas ABI C (`#[no_mangle] pub extern "C"`).
+- **`lib.rs` (Rust)**: Funciones seguras de cálculo, hashing y criptografía expuestas con firmas ABI C (`#[no_mangle] pub extern "C"`). Incluye el motor acelerador de procesamiento de texto: cálculo de métricas de lectura y snippets de Markdown en una pasada nativa (`rust_process_note_summary`), y motor de búsqueda insensible a mayúsculas (`rust_match_note`).
 
 ### 2. Capa de Datos (`app/src/main/java/com/example/data`)
 - **Room Database**: Utiliza SQLite embebido sin dependencias en la nube.
@@ -91,7 +91,7 @@ Este documento detalla el árbol de directorios, la organización de módulos y 
 
 ### 3. Capa de Presentación (`app/src/main/java/com/example/ui`)
 - **Jetpack Compose + Material 3**: UI declarativa, soporte para modo oscuro/claro, animaciones fluidas y accesibilidad táctil con áreas mínimas de 48dp.
-- **Sistema Tipográfico Dinámico**: 5 familias de fuentes nativas seleccionables en caliente con persistencia sin conexión.
+- **Sistema Tipográfico Granular**: 5 familias de fuentes nativas seleccionables de forma individual por nota o por fragmento de texto (`[font:id]...[/font]`) sin alterar la aplicación globalmente, con persistencia en base de datos Room.
 - **`NotesViewModel`**: Maneja el estado de la UI (`StateFlow`) desacoplado del ciclo de vida de la actividad.
 
 ---

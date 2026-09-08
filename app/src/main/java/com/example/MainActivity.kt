@@ -63,27 +63,30 @@ fun VaultNotesApp(viewModel: NotesViewModel) {
   val isCompactView by viewModel.isCompactView.collectAsStateWithLifecycle()
   val selectedFont by viewModel.selectedFont.collectAsStateWithLifecycle()
 
+  // Navigate smoothly between Note List and Note Editor without recreating the editor on every keystroke
   AnimatedContent(
-    targetState = activeNote,
+    targetState = (activeNote != null),
     transitionSpec = { fadeIn() togetherWith fadeOut() },
     label = "ScreenTransition"
-  ) { currentActiveNote ->
-    if (currentActiveNote != null) {
-      NoteEditorScreen(
-        note = currentActiveNote,
-        editorMode = editorMode,
-        selectedFont = selectedFont,
-        onTitleChange = viewModel::updateActiveNoteTitle,
-        onContentChange = viewModel::updateActiveNoteContent,
-        onIconChange = viewModel::updateActiveNoteIcon,
-        onTagsChange = viewModel::updateActiveNoteTags,
-        onTogglePin = viewModel::toggleActiveNotePin,
-        onToggleTask = viewModel::toggleTaskAtLine,
-        onModeChange = viewModel::setEditorMode,
-        onFontSelected = viewModel::setFontTheme,
-        onDeleteNote = viewModel::deleteActiveNote,
-        onBackClick = viewModel::closeActiveNote
-      )
+  ) { isEditing ->
+    if (isEditing) {
+      val currentActiveNote = activeNote
+      if (currentActiveNote != null) {
+        NoteEditorScreen(
+          note = currentActiveNote,
+          editorMode = editorMode,
+          onTitleChange = viewModel::updateActiveNoteTitle,
+          onContentChange = viewModel::updateActiveNoteContent,
+          onIconChange = viewModel::updateActiveNoteIcon,
+          onTagsChange = viewModel::updateActiveNoteTags,
+          onTogglePin = viewModel::toggleActiveNotePin,
+          onToggleTask = viewModel::toggleTaskAtLine,
+          onModeChange = viewModel::setEditorMode,
+          onNoteFontChange = viewModel::updateActiveNoteFontTheme,
+          onDeleteNote = viewModel::deleteActiveNote,
+          onBackClick = viewModel::closeActiveNote
+        )
+      }
     } else {
       NotesListScreen(
         notes = notes,

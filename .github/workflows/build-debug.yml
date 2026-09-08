@@ -50,20 +50,12 @@ jobs:
             "ndk;26.1.10909125" \
             "cmake;3.22.1"
 
-      - name: 6. Preparar variables de entorno mínimas (.env)
-        run: |
-          if [ -f .env.example ]; then
-            cp .env.example .env
-          else
-            touch .env
-          fi
-
-      - name: 7. Obligar generación limpia y desde 0 del Keystore Debug
+      - name: 6. Obligar generación limpia y desde 0 del Keystore Debug
         run: |
           chmod +x ./setup_debug_keystore.sh
           ./setup_debug_keystore.sh
 
-      - name: 8. Configurar Gradle Wrapper si no está presente
+      - name: 7. Configurar Gradle Wrapper si no está presente
         run: |
           if [ ! -f ./gradlew ]; then
             echo "-> Generando binario gradlew localmente..."
@@ -71,14 +63,14 @@ jobs:
           fi
           chmod +x ./gradlew
 
-      - name: 9. Compilar APK Debug (C++ + Rust + Lua + Kotlin, SIN CACHE)
+      - name: 8. Compilar APK Debug (C++ + Rust + Lua + Kotlin, SIN CACHE)
         run: |
           ./gradlew assembleDebug \
             --no-build-cache \
             --no-daemon \
             --stacktrace
 
-      - name: 10. Subir APK Debug generado como artefacto descargable
+      - name: 9. Subir APK Debug generado como artefacto descargable
         uses: actions/upload-artifact@v4
         with:
           name: VaultNotes-Debug-APK

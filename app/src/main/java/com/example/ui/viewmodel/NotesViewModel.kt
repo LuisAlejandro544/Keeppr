@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.data.model.Note
 import com.example.data.repository.NoteRepository
+import com.example.native.NativeEngine
 import com.example.ui.markdown.MarkdownParser
 import com.example.ui.theme.AppFontTheme
 import kotlinx.coroutines.Dispatchers
@@ -74,7 +75,11 @@ class NotesViewModel(
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // Filtered notes list calculated on background thread
+    /**
+     * Lista reactiva de notas filtradas, calculada en un hilo de fondo (Dispatchers.Default)
+     * utilizando el motor de búsqueda nativo en Rust para acelerar coincidencias en títulos,
+     * contenido y etiquetas sin bloquear la interfaz de usuario.
+     */
     val filteredNotes: StateFlow<List<Note>> = combine(
         repository.allNotes,
         _searchQuery,
@@ -85,10 +90,13 @@ class NotesViewModel(
             notes
         } else {
             notes.filter { note ->
-                val matchesQuery = q.isBlank() ||
-                    note.title.contains(q, ignoreCase = true) ||
-                    note.content.contains(q, ignoreCase = true) ||
-                    note.tags.contains(q, ignoreCase = true)
+                // Motor nativo de Rust acelerando la búsqueda insensible a mayúsculas
+                val matchesQuery = q.isBlank() || NativeEngine.matchNote(
+                    query = q,
+                    title = note.title,
+                    content = note.content,
+                    tags = note.tags
+                )
 
                 val matchesTag = tag == null || note.tagList.any { it.equals(tag, ignoreCase = true) }
 
@@ -122,6 +130,7 @@ class NotesViewModel(
             content = "",
             icon = "📝",
             tags = "",
+            fontTheme = "default",
             isPinned = false
         )
         viewModelScope.launch {
@@ -134,6 +143,14 @@ class NotesViewModel(
 
     fun setEditorMode(mode: EditorMode) {
         _editorMode.value = mode
+    }
+
+    fun updateActiveNoteFontTheme(fontThemeId: String) {
+        _activeNote.value?.let { current ->
+            val updated = current.copy(fontTheme = fontThemeId, updatedAt = System.currentTimeMillis())
+            _activeNote.value = updated
+            saveNoteAsync(updated, debounce = false)
+        }
     }
 
     fun updateActiveNoteTitle(newTitle: String) {

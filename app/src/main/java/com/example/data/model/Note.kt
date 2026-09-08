@@ -11,6 +11,7 @@ data class Note(
     val content: String,
     val icon: String = "📝",
     val tags: String = "",
+    val fontTheme: String = "default",
     val isPinned: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
