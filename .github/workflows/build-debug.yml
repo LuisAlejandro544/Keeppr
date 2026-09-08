@@ -1,0 +1,86 @@
+name: Build Debug APK
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build-debug:
+    name: Compile & Sign Debug APK (No Cache)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 1. Descargar código fuente del repositorio
+        uses: actions/checkout@v4
+
+      - name: 2. Configurar entorno Java (JDK 17) sin caché
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          # Sin caché como se solicitó explícitamente
+
+      - name: 3. Configurar Toolchain de Rust y targets Android
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          rustup target add aarch64-linux-android x86_64-linux-android
+          echo "Rust version:"
+          rustc --version
+          cargo --version
+          rustup target list --installed
+
+      - name: 4. Instalar herramientas de compilación C++ y dependencias nativas
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential clang cmake ninja-build
+
+      - name: 5. Instalar Android NDK y CMake específico vía SDKManager
+        run: |
+          export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+          echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+
+          # Aceptar licencias e instalar la versión exacta requerida del NDK y CMake
+          yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+          yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" \
+            "ndk;26.1.10909125" \
+            "cmake;3.22.1"
+
+      - name: 6. Preparar variables de entorno mínimas (.env)
+        run: |
+          if [ -f .env.example ]; then
+            cp .env.example .env
+          else
+            touch .env
+          fi
+
+      - name: 7. Obligar generación limpia y desde 0 del Keystore Debug
+        run: |
+          chmod +x ./setup_debug_keystore.sh
+          ./setup_debug_keystore.sh
+
+      - name: 8. Configurar Gradle Wrapper si no está presente
+        run: |
+          if [ ! -f ./gradlew ]; then
+            echo "-> Generando binario gradlew localmente..."
+            gradle wrapper || (sudo apt-get install -y gradle && gradle wrapper)
+          fi
+          chmod +x ./gradlew
+
+      - name: 9. Compilar APK Debug (C++ + Rust + Lua + Kotlin, SIN CACHE)
+        run: |
+          ./gradlew assembleDebug \
+            --no-build-cache \
+            --no-daemon \
+            --stacktrace
+
+      - name: 10. Subir APK Debug generado como artefacto descargable
+        uses: actions/upload-artifact@v4
+        with:
+          name: VaultNotes-Debug-APK
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error

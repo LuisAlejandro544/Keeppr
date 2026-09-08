@@ -1,0 +1,22 @@
+<resources>
+    <string name="app_name">VaultNotes</string>
+    <string name="notes_title">Mis Notas</string>
+    <string name="search_notes_placeholder">Buscar notas o #etiquetas…</string>
+    <string name="no_notes_found">No se encontraron notas</string>
+    <string name="no_notes_description">Crea una nueva nota para empezar a escribir con Markdown y bloques.</string>
+    <string name="create_note">Nueva Nota</string>
+    <string name="edit_mode">Editar</string>
+    <string name="preview_mode">Vista Previa</string>
+    <string name="note_title_placeholder">Título de la nota…</string>
+    <string name="note_content_placeholder">Escribe tu contenido en Markdown aquí…</string>
+    <string name="delete_note">Eliminar nota</string>
+    <string name="delete_confirm_title">¿Eliminar esta nota?</string>
+    <string name="delete_confirm_message">Esta acción no se puede deshacer.</string>
+    <string name="cancel">Cancelar</string>
+    <string name="delete">Eliminar</string>
+    <string name="save">Guardar</string>
+    <string name="all_notes">Todas</string>
+    <string name="tags_label">Etiquetas</string>
+    <string name="words_count">%d palabras</string>
+    <string name="character_count">%d caracteres</string>
+</resources>

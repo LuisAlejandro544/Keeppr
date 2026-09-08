@@ -1,0 +1,6 @@
+{
+  "name": "VaultNotes",
+  "description": "Aplicación minimalista y potente de notas combinando Markdown estilo Obsidian y bloques visuales de Notion.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
