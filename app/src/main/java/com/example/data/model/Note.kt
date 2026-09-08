@@ -19,7 +19,21 @@ data class Note(
         get() = if (tags.isBlank()) emptyList() else tags.split(",").map { it.trim() }.filter { it.isNotBlank() }
 
     val wordCount: Int
-        get() = if (content.isBlank()) 0 else content.trim().split(Regex("\\s+")).size
+        get() {
+            if (content.isBlank()) return 0
+            var count = 0
+            var inWord = false
+            val len = content.length
+            for (i in 0 until len) {
+                if (content[i].isWhitespace()) {
+                    inWord = false
+                } else if (!inWord) {
+                    inWord = true
+                    count++
+                }
+            }
+            return count
+        }
 
     val characterCount: Int
         get() = content.length

@@ -75,7 +75,10 @@ import androidx.compose.foundation.verticalScroll
 import com.example.R
 import com.example.data.model.Note
 import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material.icons.filled.FormatSize
 import com.example.native.NativeEngine
+import com.example.ui.components.FontSelectionDialog
+import com.example.ui.theme.AppFontTheme
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -88,16 +91,19 @@ fun NotesListScreen(
     searchQuery: String,
     selectedTag: String?,
     isCompactView: Boolean,
+    selectedFont: AppFontTheme = AppFontTheme.DEFAULT,
     onSearchQueryChange: (String) -> Unit,
     onTagSelect: (String?) -> Unit,
     onToggleViewMode: () -> Unit,
     onNoteClick: (Note) -> Unit,
     onCreateNoteClick: () -> Unit,
     onDeleteNote: (Note) -> Unit,
+    onFontSelected: (AppFontTheme) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var noteToDelete by remember { mutableStateOf<Note?>(null) }
     var showNativeEngineDialog by remember { mutableStateOf(false) }
+    var showFontDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -117,6 +123,17 @@ fun NotesListScreen(
                     }
                 },
                 actions = {
+                    IconButton(
+                        onClick = { showFontDialog = true },
+                        modifier = Modifier.testTag("list_select_font_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.FormatSize,
+                            contentDescription = stringResource(R.string.select_typography),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
                     IconButton(
                         onClick = { showNativeEngineDialog = true },
                         modifier = Modifier.testTag("native_engine_button")
@@ -434,6 +451,17 @@ fun NotesListScreen(
                     Text("Cerrar")
                 }
             }
+        )
+    }
+
+    // Diálogo interactivo para elegir entre las 5 tipografías de VaultNotes
+    if (showFontDialog) {
+        FontSelectionDialog(
+            currentFont = selectedFont,
+            onFontSelected = { newFont ->
+                onFontSelected(newFont)
+            },
+            onDismissRequest = { showFontDialog = false }
         )
     }
 }

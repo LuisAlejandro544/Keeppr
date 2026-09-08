@@ -19,4 +19,7 @@
     <string name="tags_label">Etiquetas</string>
     <string name="words_count">%d palabras</string>
     <string name="character_count">%d caracteres</string>
+    <string name="select_typography">Tipografía de lectura y notas</string>
+    <string name="select_typography_desc">Elige entre 5 estilos de letra optimizados para lectura y edición offline.</string>
+    <string name="close">Cerrar</string>
 </resources>

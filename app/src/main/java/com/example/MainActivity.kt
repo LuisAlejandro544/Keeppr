@@ -30,14 +30,17 @@ class MainActivity : ComponentActivity() {
   private val viewModel: NotesViewModel by viewModels {
     val database = AppDatabase.getDatabase(applicationContext)
     val repository = NoteRepository(database.noteDao())
-    NotesViewModel.Factory(repository)
+    NotesViewModel.Factory(repository, applicationContext)
   }
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     enableEdgeToEdge()
     setContent {
-      MyApplicationTheme {
+      // Observa la tipografía persistida en vivo para propagarla a todo el árbol de Compose
+      val selectedFont by viewModel.selectedFont.collectAsStateWithLifecycle()
+
+      MyApplicationTheme(fontTheme = selectedFont) {
         Surface(
           modifier = Modifier.fillMaxSize(),
           color = MaterialTheme.colorScheme.background
@@ -58,6 +61,7 @@ fun VaultNotesApp(viewModel: NotesViewModel) {
   val activeNote by viewModel.activeNote.collectAsStateWithLifecycle()
   val editorMode by viewModel.editorMode.collectAsStateWithLifecycle()
   val isCompactView by viewModel.isCompactView.collectAsStateWithLifecycle()
+  val selectedFont by viewModel.selectedFont.collectAsStateWithLifecycle()
 
   AnimatedContent(
     targetState = activeNote,
@@ -68,6 +72,7 @@ fun VaultNotesApp(viewModel: NotesViewModel) {
       NoteEditorScreen(
         note = currentActiveNote,
         editorMode = editorMode,
+        selectedFont = selectedFont,
         onTitleChange = viewModel::updateActiveNoteTitle,
         onContentChange = viewModel::updateActiveNoteContent,
         onIconChange = viewModel::updateActiveNoteIcon,
@@ -75,6 +80,7 @@ fun VaultNotesApp(viewModel: NotesViewModel) {
         onTogglePin = viewModel::toggleActiveNotePin,
         onToggleTask = viewModel::toggleTaskAtLine,
         onModeChange = viewModel::setEditorMode,
+        onFontSelected = viewModel::setFontTheme,
         onDeleteNote = viewModel::deleteActiveNote,
         onBackClick = viewModel::closeActiveNote
       )
@@ -85,12 +91,14 @@ fun VaultNotesApp(viewModel: NotesViewModel) {
         searchQuery = searchQuery,
         selectedTag = selectedTag,
         isCompactView = isCompactView,
+        selectedFont = selectedFont,
         onSearchQueryChange = viewModel::onSearchQueryChange,
         onTagSelect = viewModel::onTagSelect,
         onToggleViewMode = viewModel::toggleViewMode,
         onNoteClick = viewModel::openNote,
         onCreateNoteClick = viewModel::createNewNote,
-        onDeleteNote = viewModel::deleteNote
+        onDeleteNote = viewModel::deleteNote,
+        onFontSelected = viewModel::setFontTheme
       )
     }
   }

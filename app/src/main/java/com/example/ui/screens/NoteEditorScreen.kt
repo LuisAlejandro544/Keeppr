@@ -2,21 +2,31 @@ package com.example.ui.screens
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -50,13 +60,16 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
@@ -67,21 +80,27 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import com.example.R
 import com.example.data.model.Note
 import com.example.ui.components.EmojiPickerDialog
+import com.example.ui.components.FontSelectionDialog
 import com.example.ui.components.MarkdownToolbar
 import com.example.ui.markdown.MarkdownPreview
+import com.example.ui.theme.AppFontTheme
 import com.example.ui.viewmodel.EditorMode
+import androidx.compose.material.icons.filled.FormatSize
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun NoteEditorScreen(
     note: Note,
     editorMode: EditorMode,
+    selectedFont: AppFontTheme = AppFontTheme.DEFAULT,
     onTitleChange: (String) -> Unit,
     onContentChange: (String) -> Unit,
     onIconChange: (String) -> Unit,
@@ -89,6 +108,7 @@ fun NoteEditorScreen(
     onTogglePin: () -> Unit,
     onToggleTask: (lineIndex: Int) -> Unit,
     onModeChange: (EditorMode) -> Unit,
+    onFontSelected: (AppFontTheme) -> Unit = {},
     onDeleteNote: () -> Unit,
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -96,6 +116,12 @@ fun NoteEditorScreen(
     var showEmojiPicker by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showTagsEditor by remember { mutableStateOf(false) }
+    var showFontDialog by remember { mutableStateOf(false) }
+
+    var isContentFocused by remember { mutableStateOf(false) }
+    val isImeVisible = WindowInsets.isImeVisible
+    val bringIntoViewRequester = remember { BringIntoViewRequester() }
+    val coroutineScope = rememberCoroutineScope()
 
     // Intercept hardware or gesture back button to close active note gracefully
     BackHandler {
@@ -110,6 +136,20 @@ fun NoteEditorScreen(
     // Sync content if changed externally (e.g., from toggling tasks in preview)
     if (contentFieldValue.text != note.content) {
         contentFieldValue = contentFieldValue.copy(text = note.content)
+    }
+
+    // Auto-scroll towards cursor when typing, changing selection, or opening keyboard
+    LaunchedEffect(contentFieldValue.selection) {
+        if (isContentFocused) {
+            bringIntoViewRequester.bringIntoView()
+        }
+    }
+
+    LaunchedEffect(isImeVisible) {
+        if (isImeVisible && isContentFocused) {
+            delay(150)
+            bringIntoViewRequester.bringIntoView()
+        }
     }
 
     Scaffold(
@@ -183,6 +223,17 @@ fun NoteEditorScreen(
                 },
                 actions = {
                     IconButton(
+                        onClick = { showFontDialog = true },
+                        modifier = Modifier.testTag("editor_select_font_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.FormatSize,
+                            contentDescription = stringResource(R.string.select_typography),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    IconButton(
                         onClick = onTogglePin,
                         modifier = Modifier.testTag("toggle_pin_button")
                     ) {
@@ -210,8 +261,13 @@ fun NoteEditorScreen(
             )
         },
         bottomBar = {
-            // Only show Markdown toolbar in EDIT mode
-            if (editorMode == EditorMode.EDIT) {
+            // Only show Markdown toolbar when actively writing in EDIT mode (cursor/keyboard active)
+            val showToolbar = editorMode == EditorMode.EDIT && (isContentFocused || isImeVisible)
+            AnimatedVisibility(
+                visible = showToolbar,
+                enter = fadeIn() + slideInVertically { it },
+                exit = fadeOut() + slideOutVertically { it }
+            ) {
                 MarkdownToolbar(
                     onInsertText = { prefix, suffix ->
                         val text = contentFieldValue.text
@@ -228,6 +284,9 @@ fun NoteEditorScreen(
                             selection = TextRange(newCursorPos)
                         )
                         onContentChange(newText)
+                        coroutineScope.launch {
+                            bringIntoViewRequester.bringIntoView()
+                        }
                     },
                     modifier = Modifier.testTag("editor_markdown_toolbar")
                 )
@@ -330,13 +389,27 @@ fun NoteEditorScreen(
                     val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
                     sdf.format(Date(note.updatedAt))
                 }
+                val wordCount = remember(contentFieldValue.text) {
+                    var count = 0
+                    var inWord = false
+                    val text = contentFieldValue.text
+                    for (i in 0 until text.length) {
+                        if (text[i].isWhitespace()) {
+                            inWord = false
+                        } else if (!inWord) {
+                            inWord = true
+                            count++
+                        }
+                    }
+                    count
+                }
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Editado $formattedTime • ${note.wordCount} palabras • ${note.characterCount} caracteres",
+                        text = "Editado $formattedTime • $wordCount palabras • ${contentFieldValue.text.length} caracteres",
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     )
@@ -357,10 +430,23 @@ fun NoteEditorScreen(
                         onValueChange = { newValue ->
                             contentFieldValue = newValue
                             onContentChange(newValue.text)
+                            coroutineScope.launch {
+                                bringIntoViewRequester.bringIntoView()
+                            }
                         },
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(horizontal = 12.dp)
+                            .bringIntoViewRequester(bringIntoViewRequester)
+                            .onFocusChanged { focusState ->
+                                isContentFocused = focusState.isFocused
+                                if (focusState.isFocused) {
+                                    coroutineScope.launch {
+                                        delay(150)
+                                        bringIntoViewRequester.bringIntoView()
+                                    }
+                                }
+                            }
                             .testTag("note_content_input"),
                         placeholder = {
                             Text(
@@ -380,7 +466,7 @@ fun NoteEditorScreen(
                         textStyle = MaterialTheme.typography.bodyLarge.copy(
                             fontSize = 15.sp,
                             lineHeight = 22.sp,
-                            fontFamily = FontFamily.Default,
+                            fontFamily = selectedFont.fontFamily,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                     )
@@ -440,6 +526,17 @@ fun NoteEditorScreen(
                     Text(stringResource(R.string.cancel))
                 }
             }
+        )
+    }
+
+    // Diálogo para seleccionar una de las 5 tipografías disponibles
+    if (showFontDialog) {
+        FontSelectionDialog(
+            currentFont = selectedFont,
+            onFontSelected = { newFont ->
+                onFontSelected(newFont)
+            },
+            onDismissRequest = { showFontDialog = false }
         )
     }
 }

@@ -8,8 +8,11 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
-
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.graphics.Color
 
 private val DarkColorScheme =
@@ -48,11 +51,19 @@ private val LightColorScheme =
     outlineVariant = Color(0xFFD1D5DB),
   )
 
+/**
+ * Tema principal de VaultNotes.
+ *
+ * Configura la paleta de colores M3 (con soporte dinámico en Android 12+),
+ * una escala de fuentes fijada a 1.0f para prevenir desbordes en pantalla móvil,
+ * y la tipografía activa elegida entre las 5 opciones nativas de Android.
+ */
 @Composable
 fun MyApplicationTheme(
   darkTheme: Boolean = isSystemInDarkTheme(),
   // Dynamic color is available on Android 12+
   dynamicColor: Boolean = true,
+  fontTheme: AppFontTheme = AppFontTheme.DEFAULT,
   content: @Composable () -> Unit,
 ) {
   val colorScheme =
@@ -66,5 +77,18 @@ fun MyApplicationTheme(
       else -> LightColorScheme
     }
 
-  MaterialTheme(colorScheme = colorScheme, typography = Typography, content = content)
+  // Se crea el conjunto de estilos tipográficos adaptado a la tipografía seleccionada
+  val typography = remember(fontTheme) {
+    createAppTypography(fontTheme.fontFamily)
+  }
+
+  val currentDensity = LocalDensity.current
+  CompositionLocalProvider(
+    LocalDensity provides Density(
+      density = currentDensity.density,
+      fontScale = 1.0f
+    )
+  ) {
+    MaterialTheme(colorScheme = colorScheme, typography = typography, content = content)
+  }
 }

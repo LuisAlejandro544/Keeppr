@@ -27,7 +27,7 @@ jobs:
         run: |
           rustup toolchain install stable --profile minimal
           rustup default stable
-          rustup target add aarch64-linux-android x86_64-linux-android
+          rustup target add aarch64-linux-android x86_64-linux-android armv7-linux-androideabi
           echo "Rust version:"
           rustc --version
           cargo --version

@@ -1,16 +1,23 @@
 package com.example.ui.viewmodel
 
+import android.content.Context
+import android.content.SharedPreferences
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.data.model.Note
 import com.example.data.repository.NoteRepository
 import com.example.ui.markdown.MarkdownParser
+import com.example.ui.theme.AppFontTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -19,7 +26,30 @@ enum class EditorMode {
     PREVIEW
 }
 
-class NotesViewModel(private val repository: NoteRepository) : ViewModel() {
+class NotesViewModel(
+    private val repository: NoteRepository,
+    context: Context? = null
+) : ViewModel() {
+
+    private val prefs: SharedPreferences? =
+        context?.applicationContext?.getSharedPreferences("vaultnotes_prefs", Context.MODE_PRIVATE)
+
+    // Estado reactivo para la tipografía seleccionada (1 de 5 disponibles)
+    private val _selectedFont = MutableStateFlow(
+        AppFontTheme.fromId(prefs?.getString("selected_font_theme", AppFontTheme.DEFAULT.id))
+    )
+    val selectedFont: StateFlow<AppFontTheme> = _selectedFont.asStateFlow()
+
+    /**
+     * Actualiza la tipografía activa de la aplicación y la almacena de forma persistente
+     * en SharedPreferences para que sobreviva a reinicios sin requerir internet.
+     */
+    fun setFontTheme(fontTheme: AppFontTheme) {
+        _selectedFont.value = fontTheme
+        prefs?.edit()?.putString("selected_font_theme", fontTheme.id)?.apply()
+    }
+
+    private var saveJob: Job? = null
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
@@ -36,30 +66,38 @@ class NotesViewModel(private val repository: NoteRepository) : ViewModel() {
     private val _isCompactView = MutableStateFlow(false)
     val isCompactView: StateFlow<Boolean> = _isCompactView.asStateFlow()
 
-    // All tags aggregated from all notes
+    // All tags aggregated from all notes on background thread
     val allTags: StateFlow<List<String>> = repository.allNotes
         .combine(_selectedTag) { notes, _ ->
             notes.flatMap { it.tagList }.distinct().sorted()
         }
+        .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // Filtered notes list
+    // Filtered notes list calculated on background thread
     val filteredNotes: StateFlow<List<Note>> = combine(
         repository.allNotes,
         _searchQuery,
         _selectedTag
     ) { notes, query, tag ->
-        notes.filter { note ->
-            val matchesQuery = query.isBlank() ||
-                note.title.contains(query, ignoreCase = true) ||
-                note.content.contains(query, ignoreCase = true) ||
-                note.tags.contains(query, ignoreCase = true)
+        val q = query.trim()
+        if (q.isBlank() && tag == null) {
+            notes
+        } else {
+            notes.filter { note ->
+                val matchesQuery = q.isBlank() ||
+                    note.title.contains(q, ignoreCase = true) ||
+                    note.content.contains(q, ignoreCase = true) ||
+                    note.tags.contains(q, ignoreCase = true)
 
-            val matchesTag = tag == null || note.tagList.any { it.equals(tag, ignoreCase = true) }
+                val matchesTag = tag == null || note.tagList.any { it.equals(tag, ignoreCase = true) }
 
-            matchesQuery && matchesTag
+                matchesQuery && matchesTag
+            }
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    }
+    .flowOn(Dispatchers.Default)
+    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun onSearchQueryChange(query: String) {
         _searchQuery.value = query
@@ -102,7 +140,7 @@ class NotesViewModel(private val repository: NoteRepository) : ViewModel() {
         _activeNote.value?.let { current ->
             val updated = current.copy(title = newTitle, updatedAt = System.currentTimeMillis())
             _activeNote.value = updated
-            saveNoteAsync(updated)
+            saveNoteAsync(updated, debounce = true)
         }
     }
 
@@ -110,7 +148,7 @@ class NotesViewModel(private val repository: NoteRepository) : ViewModel() {
         _activeNote.value?.let { current ->
             val updated = current.copy(content = newContent, updatedAt = System.currentTimeMillis())
             _activeNote.value = updated
-            saveNoteAsync(updated)
+            saveNoteAsync(updated, debounce = true)
         }
     }
 
@@ -118,7 +156,7 @@ class NotesViewModel(private val repository: NoteRepository) : ViewModel() {
         _activeNote.value?.let { current ->
             val updated = current.copy(icon = newIcon, updatedAt = System.currentTimeMillis())
             _activeNote.value = updated
-            saveNoteAsync(updated)
+            saveNoteAsync(updated, debounce = false)
         }
     }
 
@@ -126,7 +164,7 @@ class NotesViewModel(private val repository: NoteRepository) : ViewModel() {
         _activeNote.value?.let { current ->
             val updated = current.copy(tags = newTags, updatedAt = System.currentTimeMillis())
             _activeNote.value = updated
-            saveNoteAsync(updated)
+            saveNoteAsync(updated, debounce = true)
         }
     }
 
@@ -134,7 +172,7 @@ class NotesViewModel(private val repository: NoteRepository) : ViewModel() {
         _activeNote.value?.let { current ->
             val updated = current.copy(isPinned = !current.isPinned, updatedAt = System.currentTimeMillis())
             _activeNote.value = updated
-            saveNoteAsync(updated)
+            saveNoteAsync(updated, debounce = false)
         }
     }
 
@@ -143,13 +181,14 @@ class NotesViewModel(private val repository: NoteRepository) : ViewModel() {
             val newContent = MarkdownParser.toggleChecklistAt(current.content, lineIndex)
             val updated = current.copy(content = newContent, updatedAt = System.currentTimeMillis())
             _activeNote.value = updated
-            saveNoteAsync(updated)
+            saveNoteAsync(updated, debounce = false)
         }
     }
 
     fun deleteActiveNote() {
         _activeNote.value?.let { current ->
-            viewModelScope.launch {
+            saveJob?.cancel()
+            viewModelScope.launch(Dispatchers.IO) {
                 repository.delete(current)
                 _activeNote.value = null
             }
@@ -157,7 +196,7 @@ class NotesViewModel(private val repository: NoteRepository) : ViewModel() {
     }
 
     fun deleteNote(note: Note) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             repository.delete(note)
             if (_activeNote.value?.id == note.id) {
                 _activeNote.value = null
@@ -167,22 +206,36 @@ class NotesViewModel(private val repository: NoteRepository) : ViewModel() {
 
     fun closeActiveNote() {
         _activeNote.value?.let { current ->
-            saveNoteAsync(current)
+            saveJob?.cancel()
+            viewModelScope.launch(Dispatchers.IO) {
+                repository.update(current)
+            }
         }
         _activeNote.value = null
     }
 
-    private fun saveNoteAsync(note: Note) {
-        viewModelScope.launch {
-            repository.update(note)
+    private fun saveNoteAsync(note: Note, debounce: Boolean = true) {
+        saveJob?.cancel()
+        if (debounce) {
+            saveJob = viewModelScope.launch(Dispatchers.IO) {
+                delay(500L)
+                repository.update(note)
+            }
+        } else {
+            viewModelScope.launch(Dispatchers.IO) {
+                repository.update(note)
+            }
         }
     }
 
-    class Factory(private val repository: NoteRepository) : ViewModelProvider.Factory {
+    class Factory(
+        private val repository: NoteRepository,
+        private val context: Context? = null
+    ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(NotesViewModel::class.java)) {
-                return NotesViewModel(repository) as T
+                return NotesViewModel(repository, context) as T
             }
             throw IllegalArgumentException("Unknown ViewModel class")
         }

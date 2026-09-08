@@ -11,10 +11,13 @@ Plan de evolución técnica y funcional para la aplicación VaultNotes.
 - [x] Base de datos local Room con entidades de notas, categorías, etiquetas y búsqueda indexada.
 - [x] Integración de toolchains nativos simultáneos en Gradle:
   - C++17 mediante CMake y JNI (`libvaultnotes_native.so`).
-  - Rust mediante Cargo con soporte `aarch64-linux-android` y `x86_64-linux-android` (`libvaultnotes_rust.a`).
+  - Rust mediante Cargo con soporte multiarquitectura: `arm64-v8a` (64 bits), `armeabi-v7a` (32 bits / Android Go) y `x86_64` (`libvaultnotes_rust.a`).
   - Motor C oficial de Lua 5.4.6 compilado estáticamente sin wrappers de terceros.
 - [x] Diálogo interactivo en la UI para inspección de motores y ejecución dinámica de scripts Lua.
+- [x] Personalización tipográfica con 5 familias nativas del sistema Android (Predeterminada, Sans-Serif, Serif, Monoespaciada, Cursiva) con vista previa interactiva y persistencia offline.
 - [x] Script de mantenimiento automatizado `clean_native_artifacts.sh` para purgar carpetas `target`, `.cxx` y archivos residuales.
+- [x] Automatización CI con GitHub Actions (compilación limpia sin caché de APK Debug y soporte para sobrescritura de commits).
+- [x] Script autónomo `setup_debug_keystore.sh` para generación forzada y limpia del keystore debug sin dependencias externas.
 
 ---
 
@@ -48,3 +51,13 @@ Plan de evolución técnica y funcional para la aplicación VaultNotes.
 - [ ] Empaquetado APK standalone sin dependencias de Google Play Services, optimizado para plataformas como Uptodown, F-Droid y APKMirror.
 - [ ] Pruebas de compatibilidad en dispositivos Android Go y procesadores de gama baja a media.
 - [ ] Documentación para empaquetadores comunitarios e integradores de código abierto.
+
+---
+
+## 🗳️ Gobernanza de Funciones: Impulsada por la Comunidad
+
+Para proteger a VaultNotes del *feature bloat* y de código innecesario que casi nadie utiliza:
+
+1. **Priorización por demanda real:** Solo se implementarán aquellas características propuestas y votadas activamente por la comunidad de usuarios.
+2. **Núcleo ligero:** El núcleo de la aplicación se mantiene austero, rápido y centrado en la seguridad de notas.
+3. **Módulos opcionales en Lua:** Las peticiones específicas de nicho se implementarán como extensiones o plantillas Lua para no sobrecargar el APK ni el consumo de memoria del sistema.

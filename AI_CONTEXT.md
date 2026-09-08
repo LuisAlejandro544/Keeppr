@@ -10,6 +10,7 @@ Este documento provee el contexto técnico, limitaciones del entorno y directric
 - **Perfil del Usuario:** El usuario opera y prueba desde un dispositivo móvil/teléfono sin acceso a una estación de trabajo PC tradicional. Por ello, todos los comandos, scripts y salidas deben ser directos, robustos y sin fricciones.
 - **Canal de Distribución:** La aplicación se distribuye como APK independiente en tiendas alternativas (Uptodown, APKMirror, F-Droid) y descarga directa, **no** en Google Play. No deben agregarse dependencias restrictivas a Google Play Services ni flujos de facturación privativos.
 - **Tolerancia al Tamaño del APK:** Al usuario no le preocupa el peso final del APK siempre y cuando las dependencias sean 100% funcionales y completas. Debe evitarse la implementación de soluciones caseras incompletas o fallbacks degradados cuando existan librerías y dependencias sólidas.
+- **Filosofía de Desarrollo Anti-Bloat (Comunidad al Mando):** La evolución funcional está guiada directamente por las propuestas de la comunidad para evitar saturar la app con funciones superfluas que casi nadie usará. Las funciones añadidas deben responder a necesidades reales votadas por usuarios. La personalización visual (como la selección de 5 tipografías del sistema) y la extensibilidad mediante Lua son ejemplos de funciones con alto valor utilitario sin recargar el núcleo.
 
 ---
 
@@ -19,7 +20,7 @@ Este documento provee el contexto técnico, limitaciones del entorno y directric
 - **Lenguajes Compilados:**
   - **Kotlin:** Capa de interfaz de usuario (Compose M3), navegación y persistencia (Room).
   - **C++17:** JNI Bridge nativo (`app/src/main/cpp/native-bridge.cpp`).
-  - **Rust (2021 Edition):** Motor de cálculo y criptografía (`app/src/main/rust`). Se compila mediante la tarea Gradle `cargoBuild` a las arquitecturas `aarch64-linux-android` y `x86_64-linux-android`.
+  - **Rust (2021 Edition):** Motor de cálculo y criptografía (`app/src/main/rust`). Se compila mediante la tarea Gradle `cargoBuild` a las arquitecturas `aarch64-linux-android` (64 bits), `armv7-linux-androideabi` (32 bits / Android Go) y `x86_64-linux-android` (emuladores).
   - **C11 (Lua 5.4.6 Oficial):** Intérprete oficial en C incluido en `app/src/main/cpp/lua/`, compilado como biblioteca estática con CMake.
 - **Integridad del Pipeline de Compilación:**
   - C++, Rust y Lua están integrados de forma obligatoria en Gradle y CMake. Si se solicitan nuevas funciones nativas, deben implementarse respetando esta cadena de herramientas sin omitirlas ni sustituirlas por soluciones simuladas en Kotlin.

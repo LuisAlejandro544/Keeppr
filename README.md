@@ -6,12 +6,12 @@ Aplicación móvil de gestión segura de notas y apuntes de alto rendimiento, di
 
 ## 📋 Requisitos Previos y Entorno
 
-- **Sistema Operativo Compatible:** Android 8.0 (Oreo / API 26) o superior.
-- **Arquitecturas NDK Soportadas:** `arm64-v8a`, `x86_64`.
+- **Sistema Operativo Compatible:** Android 8.0 (Oreo / API 26) o superior (incluyendo ediciones Android Go).
+- **Arquitecturas NDK Soportadas:** `arm64-v8a` (64 bits), `armeabi-v7a` (32 bits / Android Go), `x86_64` (emuladores de 64 bits).
 - **Android Gradle Plugin / Gradle:** 8.x+ / 9.x+.
 - **Android NDK:** Versión 26.1.10909125 o superior.
 - **CMake:** Versión 3.22.1+.
-- **Rust Toolchain:** `rustc` y `cargo` (con targets `aarch64-linux-android` y `x86_64-linux-android` instalados).
+- **Rust Toolchain:** `rustc` y `cargo` (con targets `aarch64-linux-android`, `armv7-linux-androideabi` y `x86_64-linux-android` instalados).
 - **Entorno del Usuario:** Diseñado para compilación autónoma y pruebas en teléfonos móviles y emuladores sin dependencia de Google Play Services privativos.
 
 ---
@@ -61,8 +61,24 @@ gradle :app:testDebugUnitTest
 4. **Puente JNI en C++17:**
    - Enlace bidireccional entre la JVM/ART de Kotlin y las librerías nativas con manejo de excepciones y validación de tipos JNI.
 
-5. **Distribución Autónoma:**
+5. **Personalización Tipográfica (5 Estilos Offline):**
+   - Selector interactivo accesible en la lista principal y en el editor de notas con previsualización en vivo.
+   - 5 familias tipográficas nativas de Android: *Predeterminada (Sistema)*, *Sans-Serif Moderna*, *Serif Clásica (Editorial)*, *Monoespaciada (Código)* y *Cursiva Manuscrita*.
+   - Persistencia automática de la preferencia sin requerir conectividad de red ni servicios externos.
+
+6. **Distribución Autónoma:**
    - Preparado para tiendas de aplicaciones de terceros (Uptodown, F-Droid, APK directo) cumpliendo con políticas de privacidad e integridad del sistema.
+
+---
+
+## 👥 Gobernanza y Propuestas de la Comunidad (Filosofía Anti-Bloat)
+
+Para evitar que VaultNotes se convierta en una aplicación sobrecargada con herramientas innecesarias que degraden el rendimiento:
+
+- **Evolución guiada por la comunidad:** La hoja de ruta de nuevas funciones se define a partir de propuestas y votaciones de los propios usuarios.
+- **Prevención de *Feature Bloat*:** No se implementan funciones superfluas en el núcleo de la aplicación; solo se integran aquellas características con demanda y utilidad contrastada.
+- **Extensibilidad mediante Lua:** Aquellas funciones especializadas o flujos de trabajo avanzados propuestos por sectores específicos de la comunidad pueden articularse como scripts y plantillas sobre el motor Lua integrado, manteniendo el núcleo Kotlin/Rust limpio, veloz y ultraligero.
+- **¿Cómo participar?:** Los usuarios pueden abrir propuestas de mejora o votar solicitudes existentes a través de los canales comunitarios del repositorio (Discussions e Issues de GitHub).
 
 ---
 
@@ -70,13 +86,15 @@ gradle :app:testDebugUnitTest
 
 ```text
 ├── app/
-│   ├── build.gradle.kts          # Pipeline de Gradle, tareas cargoBuild y enlace CMake
+│   ├── build.gradle.kts          # Pipeline de Gradle, tareas cargoBuild (arm64, armv7, x86_64) y CMake
 │   └── src/
 │       └── main/
 │           ├── cpp/              # Código fuente C++ (JNI) y C (Lua 5.4.6 oficial)
 │           ├── rust/             # Código fuente Rust (Cargo.toml, src/lib.rs)
 │           ├── java/com/example/ # Código Kotlin, Compose UI, ViewModels, Room DB
 │           └── res/              # Recursos visuales, temas XML y cadenas
+├── .github/workflows/            # Flujos de CI de GitHub Actions (build-debug, override-commit)
+├── setup_debug_keystore.sh       # Generador autónomo y limpio de debug.keystore
 ├── clean_native_artifacts.sh     # Script para purgar artefactos pesados (target, .cxx)
 ├── AI_CONTEXT.md                 # Contexto de negocio y arquitectura para IAs
 ├── STRUCTURE.md                  # Especificación detallada de módulos y archivos

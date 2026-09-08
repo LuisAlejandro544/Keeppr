@@ -28,7 +28,7 @@ android {
       }
     }
     ndk {
-      abiFilters.addAll(listOf("arm64-v8a", "x86_64"))
+      abiFilters.addAll(listOf("arm64-v8a", "x86_64", "armeabi-v7a"))
     }
   }
 
@@ -170,7 +170,8 @@ val cargoBuild = tasks.register("cargoBuild") {
 
     val targets = listOf(
       "arm64-v8a" to ("aarch64-linux-android" to "aarch64-linux-android26-clang"),
-      "x86_64" to ("x86_64-linux-android" to "x86_64-linux-android26-clang")
+      "x86_64" to ("x86_64-linux-android" to "x86_64-linux-android26-clang"),
+      "armeabi-v7a" to ("armv7-linux-androideabi" to "armv7a-linux-androideabi26-clang")
     )
 
     val cargoBin = listOf(
