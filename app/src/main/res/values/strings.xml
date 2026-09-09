@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Keeppr</string>
+    <string name="app_name_base">Keeppr</string>
     <string name="notes_title">Mis Notas</string>
     <string name="search_notes_placeholder">Buscar notas o #etiquetas…</string>
     <string name="no_notes_found">No se encontraron notas</string>

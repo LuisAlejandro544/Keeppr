@@ -59,91 +59,54 @@ abstract class AppDatabase : RoomDatabase() {
         }
 
         private suspend fun populateInitialNotes(dao: NoteDao) {
-            val note1 = Note(
-                title = "Bienvenido a VaultNotes",
+            val welcomeNote = Note(
+                title = "¡Bienvenido a Keeppr!",
                 icon = "✨",
-                tags = "guia, obsidian, notion",
+                tags = "bienvenida, guia, inicio",
                 isPinned = true,
                 content = """
-# ✨ Bienvenido a VaultNotes
+# ✨ ¡Bienvenido a Keeppr!
 
-Combina la potencia de **Markdown** con la estructura limpia de bloques estilo **Notion**.
+**Keeppr** es tu espacio personal para capturar ideas, notas y listas con máxima privacidad, rapidez y control total en tu dispositivo móvil.
 
 > [!NOTE]
-> Esta app está diseñada para tomar notas con rapidez y flexibilidad. Puedes editar el texto plano y alternar a **Vista Previa** con un solo toque.
+> Keeppr funciona **100% offline**: tus notas nunca salen de tu teléfono, sin cuentas obligatorias, sin servidores intermedios y sin rastreadores.
 
 ---
 
-## 🎯 Características Principales
+## 🚀 ¿Qué puedes hacer por el momento?
 
-- [x] Soporte completo de encabezados (H1, H2, H3)
-- [x] Checklists interactivas (¡márcalas directamente en Vista Previa!)
-- [ ] Bloques destacados (Callouts) informativos
-- [ ] Resaltado de código y citas elegantes
+### 📝 1. Editor de Markdown Enriquecido
+- Escribe texto con formato **negrita**, *cursiva*, tachado y citas.
+- Inserta encabezados (`# H1`, `## H2`, `### H3`) y listas ordenadas o con viñetas.
+- Alterna instantáneamente con el botón superior entre el modo de **Edición** y la **Vista Previa**.
 
-### 💡 Ejemplo de Bloques Callout
+### ✅ 2. Listas de Tareas Interactivas
+- Crea checklists con formato `- [ ] Tarea pendiente` y `- [x] Tarea completada`.
+- ¡Márcalas y desmárcalas directamente tocando la casilla en la **Vista Previa**!
+
+### 🔒 3. Cifrado y Privacidad de Notas
+- Protege notas confidenciales asignando una contraseña individual desde el menú superior del editor.
+- Seguridad de alto nivel impulsada por el núcleo nativo (**AES-256-GCM** con derivación de claves **Argon2id**).
+
+### 🔍 4. Búsqueda y Organización Rápida
+- Busca al instante por título, contenido o etiquetas con filtrado acelerado por **Rust nativo**.
+- Organiza tu flujo de trabajo mediante etiquetas (#tags) y fija notas prioritarias con el botón 📌.
+
+### 📜 5. Automatización con Scripts Lua
+- Ejecuta scripts en **Lua 5.4.6** para transformar texto, procesar plantillas o automatizar tareas repetitivas sobre tu nota activa.
+
+### 📦 6. Copias de Seguridad y Portabilidad
+- Exporta e importa tus notas como paquetes seguros (`.vault`) o archivos Markdown estándar para respaldar tu información localmente.
+
+---
 
 > [!TIP]
-> Puedes cambiar el emoji de cada nota tocando el ícono superior en el editor.
-
-> [!WARNING]
-> Recuerda revisar la barra de accesos rápidos para insertar formatos rápidamente en tu teléfono.
-
-### 💻 Bloque de Código
-```kotlin
-fun saludar(nombre: String): String {
-    return "¡Hola, " + nombre + "! Bienvenido a VaultNotes"
-}
-```
-
-> "El conocimiento se construye nota a nota, conectando pensamientos."
+> Toca el ícono del emoji superior en cualquier momento para personalizar la identidad visual de tu nota.
                 """.trimIndent()
             )
 
-            val note2 = Note(
-                title = "Mi Lista de Tareas y Objetivos",
-                icon = "🎯",
-                tags = "personal, metas",
-                isPinned = false,
-                content = """
-# 🎯 Objetivos de la Semana
-
-Revisa tus tareas y márcalas al completarlas:
-
-### 🚀 Tareas Clave
-- [x] Explorar el editor de Markdown
-- [ ] Crear mi primera nota personalizada
-- [ ] Probar el cambio entre Vista Previa y Edición
-- [ ] Organizar notas con #etiquetas
-
-> [!INFO]
-> Al tocar una casilla en **Vista Previa**, se actualizará automáticamente tu texto Markdown en tiempo real.
-                """.trimIndent()
-            )
-
-            val note3 = Note(
-                title = "Ideas para Proyectos",
-                icon = "💡",
-                tags = "ideas, tech",
-                isPinned = false,
-                content = """
-# 💡 Lluvia de Ideas
-
-Notas rápidas para futuros proyectos y desarrollos.
-
-### 📌 Conceptos
-- **Arquitectura Limpia**: Mantener separación entre datos y UI.
-- **Modo Offline**: Almacenamiento local ultrarrápido con SQLite y Room.
-- **Diseño Ergonómico**: Botones accesibles para usar con una sola mano en el móvil.
-
----
-*Creado en VaultNotes*
-                """.trimIndent()
-            )
-
-            dao.insertNote(note1)
-            dao.insertNote(note2)
-            dao.insertNote(note3)
+            dao.insertNote(welcomeNote)
         }
     }
 }

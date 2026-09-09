@@ -87,10 +87,12 @@ fun VaultNotesApp(viewModel: NotesViewModel) {
   val editorMode by viewModel.editorMode.collectAsStateWithLifecycle()
   val isCompactView by viewModel.isCompactView.collectAsStateWithLifecycle()
 
-  // Iniciar monitores de depuración in-app para variante debug
+  // Iniciar monitores de depuración in-app exclusivamente para variante debug (Canary)
   LaunchedEffect(Unit) {
-    PerformanceMonitor.startMonitoring(scope)
-    InAppLogCollector.startCollecting(scope)
+    if (BuildConfig.DEBUG) {
+      PerformanceMonitor.startMonitoring(scope)
+      InAppLogCollector.startCollecting(scope)
+    }
   }
 
   val metrics by PerformanceMonitor.metrics.collectAsStateWithLifecycle()
@@ -104,6 +106,7 @@ fun VaultNotesApp(viewModel: NotesViewModel) {
   val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
   val dynamicColor by viewModel.dynamicColor.collectAsStateWithLifecycle()
   val accentPalette by viewModel.accentPalette.collectAsStateWithLifecycle()
+  val updateStatus by viewModel.updateStatus.collectAsStateWithLifecycle()
   val context = LocalContext.current
 
   Box(modifier = Modifier.fillMaxSize()) {
@@ -200,7 +203,7 @@ fun VaultNotesApp(viewModel: NotesViewModel) {
       }
     }
 
-    // Diálogo de Ajustes de Apariencia (Modo Claro/Oscuro/Sistema, Material You, Colores de Énfasis y Tipografía)
+    // Diálogo de Ajustes de Apariencia y Actualizaciones (Canal Beta -b con descarga directa)
     if (showSettingsDialog) {
       SettingsDialog(
         themeMode = themeMode,
@@ -211,12 +214,17 @@ fun VaultNotesApp(viewModel: NotesViewModel) {
         onDynamicColorChange = viewModel::setDynamicColor,
         onAccentPaletteChange = viewModel::setAccentPalette,
         onFontThemeChange = viewModel::setFontTheme,
+        updateStatus = updateStatus,
+        onCheckForUpdates = { viewModel.checkForUpdates(BuildConfig.VERSION_NAME) },
+        onDownloadApk = { release -> viewModel.downloadApk(release) },
+        onInstallApk = { apkFile -> viewModel.installApk(context, apkFile) },
+        onResetUpdateStatus = viewModel::resetUpdateStatus,
         onDismiss = { showSettingsDialog = false }
       )
     }
 
-    // HUD flotante de rendimiento en pantalla (FPS, RAM JVM y RAM Nativa de Rust/C++, Hilos)
-    if (isHudVisible) {
+    // HUD flotante de rendimiento en pantalla (FPS, RAM JVM y RAM Nativa de Rust/C++, Hilos) - Exclusivo Debug
+    if (BuildConfig.DEBUG && isHudVisible) {
       PerformanceFloatingHud(
         metrics = metrics,
         onOpenFullDashboard = { showDebugDashboard = true },
@@ -224,8 +232,8 @@ fun VaultNotesApp(viewModel: NotesViewModel) {
       )
     }
 
-    // Diálogo con panel completo de depuración (Rendimiento, Hilos, Logs en vivo e Hyperion/Sistema)
-    if (showDebugDashboard) {
+    // Diálogo con panel completo de depuración (Rendimiento, Hilos, Logs en vivo) - Exclusivo Debug
+    if (BuildConfig.DEBUG && showDebugDashboard) {
       DebugDashboardDialog(
         metrics = metrics,
         logs = logs,

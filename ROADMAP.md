@@ -77,21 +77,44 @@ Plan de evolución técnica y funcional para la aplicación Keeppr (anteriorment
 
 ## 📍 Fase 5: Distribución Beta y Pipeline de Release (En Curso 🔄)
 
-- [x] **Lanzamiento de Versión Beta Oficial:** Versión `v0.1.0-b` configurada en `build.gradle.kts`.
+- [x] **Diferenciación de Canales y Versiones Independientes:**
+  * **Canary (Debug):** Nombre "Keeppr Canary", versión `v0.1.0-dev`, incluye suite de depuración in-app completa y soporte para emuladores x86_64.
+  * **Beta (Release):** Nombre "Keeppr Beta", versión `v0.1.0-b`, descartando arquitecturas de emulador de PC (`x86_64`) y suprimiendo herramientas de depuración para máxima fluidez.
+  * **Versión Estable:** Planificada para integrarse en un flujo productivo independiente tras completar el ciclo de validación comunitaria.
+- [x] **Eliminación Global de Google Play Services y Rastreadores:**
+  * Proyecto 100% libre del plugin de Google Services y librerías de Firebase/rastreadores en `build.gradle.kts` (raíz y app).
+  * Arquitectura completamente offline, soberana y privada para distribución directa en Uptodown y APK independiente.
+- [x] **Optimización de Arquitecturas Móviles en Release Beta:**
+  * Descarte específico de arquitecturas de emulador de PC (`x86_64`) en la variante Release Beta.
+  * Empaquetado optimizado centrado exclusivamente en procesadores móviles reales: `arm64-v8a` (64 bits) y `armeabi-v7a` (32 bits / Android Go).
+- [x] **Aislamiento Total de Herramientas de Depuración:**
+  * Desactivación condicional estricta (`BuildConfig.DEBUG`) de monitores de rendimiento, HUD flotante, visor de hilos y consola Logcat.
+  * Exclusión del botón de depuración en la barra superior en modo Release.
+  * LeakCanary empaquetado exclusivamente en variante debug (`debugImplementation`).
 - [x] **Pipeline de Compilación Release Beta (`build-release.yml`):**
   * Disparador condicional estricto: se activa exclusivamente ante eventos de Pre-Release en GitHub con sufijo `-b` (ej. `v0.1.0-b`) o ejecución manual (`workflow_dispatch`).
-  * Compilación nativa completa (Kotlin + C++ + Rust multiarquitectura arm64/armv7/x86_64 + Lua 5.4.6).
+  * Declaración explícita en el workflow indicando el estado del canal Beta y la hoja de ruta hacia la versión estable.
+  * Compilación nativa para arquitecturas móviles (`aarch64-linux-android` y `armv7-linux-androideabi`), excluyendo tajantemente `x86_64` y `x86` del empaquetado final.
   * Soporte para firma con credenciales de producción vía GitHub Secrets (`RELEASE_KEYSTORE_BASE64`, etc.) con contingencia autofirmada.
-  * Compilación de Release sin R8/ProGuard (`isMinifyEnabled = false`) para máxima estabilidad durante el inicio de la beta.
-  * Publicación y adjuntado automático del APK a la Pre-Release de GitHub.
+  * Compilación de Release con optimización R8/ProGuard (`isMinifyEnabled = true`, `isShrinkResources = true`) reduciendo el APK de ~22 MB a ~4.45 MB con preservación 100% de JNI y Room.
+  * Generación y nombramiento oficial del artefacto como `Keeppr-v0.1.0-b-Release.apk` junto a su suma de verificación criptográfica SHA-256.
 - [x] **Pipeline y Archivo de Registro de Cambios Beta:**
-  * Flujo automatizado `process-changelog-beta.yml` activado ante Pre-Releases con sufijo `-b`, publicando automáticamente el contenido de `Chanelog-beta.md` en el cuerpo de la release de GitHub.
-  * Registro de capacidades `Chanelog-beta.md` con las 7 dimensiones clave del sistema.
+  * Flujo automatizado `process-changelog-beta.yml` activado ante Pre-Releases con sufijo `-b`, publicando automáticamente el contenido de `Changelog-beta.md` en el cuerpo de la release de GitHub.
+  * Registro de capacidades `Changelog-beta.md` con las 7 dimensiones clave del sistema.
 - [x] **Optimización de CI y Pulido de UI para Beta:**
-  * Compilación de Debug APK (`build-debug.yml`) convertida a ejecución manual (`workflow_dispatch`), liberando cuota de CI y evitando compilaciones automáticas por commit.
+  * Compilación de Debug APK (`build-debug.yml`) para la variante Canary (`v0.1.0-dev`) con artefacto `Keeppr-Canary-v0.1.0-dev-APK` en ejecución manual (`workflow_dispatch`).
   * Remoción del modal de prueba redundante "Motores Nativos" de la barra principal de notas, manteniendo el soporte completo de Lua 5.4.6 enfocado en el editor (`LuaScriptDialog`).
+  * Sustitución de notas de prueba pre-hechas por una única nota oficial de bienvenida y guía de inicio en `AppDatabase.kt`.
+- [x] **Sistema de Actualizaciones Desacoplado e Instalación Directa In-App:**
+  * Script oficial en Lua 5.4 (`updater_config.lua`) con endpoints desacoplados del binario y filtrado de pre-releases beta con sufijo `-b`.
+  * Soporte para carga dinámica del script Lua desde GitHub Raw con contingencia local en assets.
+  * Gestor reactivo `AppUpdateManager` que consulta la API de GitHub Releases, descarga el APK (.apk) a la caché privada reportando progreso (MB y %) e invoca directamente el instalador de paquetes de Android vía `FileProvider` sin salir al navegador.
+  * Sección de comprobación y descarga integrada en el diálogo de Ajustes con Material Design 3.
+- [x] **Comunidad y Gobernanza en Discord (`DISCORD_CONFIG.md`):**
+  * Estructura inicial del servidor con jerarquía de roles: 👑 Creador, 🧪 Beta Tester, 💡 Colaborador y 📱 Miembro.
+- [x] **Habilitación y Ajuste de Reglas R8 / ProGuard (`app/proguard-rules.pro`):**
+  * 5 pasadas de optimización y reducción de recursos logrando bajar el peso del APK de ~22 MB a solo ~4.45 MB sin romper firmas nativas JNI de C++, Rust o Lua 5.4.6.
 - [ ] Pruebas de compatibilidad en dispositivos Android Go y procesadores de 32 bits en hardware real.
-- [ ] Habilitación y ajuste gradual de reglas de R8/ProGuard para reducción de peso sin romper JNI en versiones posteriores.
 - [ ] Distribución del APK Beta en Uptodown y apertura de canales de feedback comunitarios (Discord / Telegram / Reddit).
 
 ---

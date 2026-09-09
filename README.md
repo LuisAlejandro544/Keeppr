@@ -2,23 +2,27 @@
 
 Aplicación móvil de gestión segura de notas y apuntes de alto rendimiento, diseñada con persistencia local robusta en Room, interfaz moderna en Jetpack Compose y un motor nativo multinúcleo en C++, Rust y Lua (C puro) compilado para distribución directa en formato APK (Uptodown y tiendas independientes).
 
-- **Nombre Oficial:** Keeppr
-- **Versión Actual:** `v0.1.0-b` (Beta)
+- **Nombre Oficial y Variantes:**
+  * **Canary (Desarrollo / Debug):** "Keeppr Canary" (Versión: `v0.1.0-dev`). Incluye suite completa de depuración in-app y soporte de emuladores de PC (`x86_64`).
+  * **Beta (Pre-Release / Release):** "Keeppr Beta" (Versión: `v0.1.0-b`). Versión de prueba comunitaria limpia, sin herramientas de depuración y optimizada descartando arquitecturas de emulador de PC.
+  * **Estable (Producción Futura):** Se integrará más adelante en un flujo oficial definitivo tras consolidar la retroalimentación de la comunidad.
 - **Identificador de Paquete (Application ID):** `com.keeppr.notes` (almacenamiento en `Android/data/com.keeppr.notes`)
 - **Identidad Visual / Icono:** Cuaderno de tapa dura personal con banda elástica vertical (estilo Moleskine) en formato WebP de máxima calidad y alta compresión (`ic_keeppr_logo.webp`), integrado como icono adaptativo Android sobre paleta oscura y acentos cálidos.
-- **Registro de Capacidades Beta:** Consultar `Chanelog-beta.md` para el desglose completo de novedades de la versión.
+- **Registro de Capacidades Beta:** Consultar `Changelog-beta.md` para el desglose completo de novedades de la versión.
 
 ---
 
 ## 📋 Requisitos Previos y Entorno
 
 - **Sistema Operativo Compatible:** Android 8.0 (Oreo / API 26) o superior (incluyendo ediciones Android Go).
-- **Arquitecturas NDK Soportadas:** `arm64-v8a` (64 bits), `armeabi-v7a` (32 bits / Android Go), `x86_64` (emuladores de 64 bits).
+- **Arquitecturas NDK Soportadas:**
+  * **APK Release Beta:** `arm64-v8a` (64 bits) y `armeabi-v7a` (32 bits / Android Go). Se descartan emuladores de PC (`x86_64`) para optimizar la distribución en Uptodown y APK independiente.
+  * **APK Debug Canary:** `arm64-v8a`, `armeabi-v7a` y `x86_64` (emuladores de PC de 64 bits para desarrollo).
 - **Android Gradle Plugin / Gradle:** 8.x+ / 9.x+.
 - **Android NDK:** Versión 26.1.10909125 o superior.
 - **CMake:** Versión 3.22.1+.
 - **Rust Toolchain:** `rustc` y `cargo` (con targets `aarch64-linux-android`, `armv7-linux-androideabi` y `x86_64-linux-android` instalados).
-- **Entorno del Usuario:** Diseñado para compilación autónoma y pruebas en teléfonos móviles y emuladores sin dependencia de Google Play Services privativos.
+- **Entorno del Usuario:** Diseñado para compilación autónoma y pruebas en teléfonos móviles sin dependencia de Google Play Services ni rastreadores privativos (100% offline y soberano).
 
 ---
 
@@ -34,6 +38,9 @@ El APK se genera en: `app/build/outputs/apk/debug/app-debug.apk`.
 ```bash
 gradle :app:assembleRelease
 ```
+El APK oficial se genera en: `app/build/outputs/apk/release/Keeppr-v0.1.0-b-Release.apk`.
+Gracias a la optimización agresiva de **R8 / ProGuard** y reducción de recursos (`isShrinkResources`), el tamaño final del APK se redujo drásticamente de **~22 MB a tan solo ~4.45 MB** (-79% de peso), garantizando una descarga ligera en conexiones móviles.
+Además, la app inicializa con una **única nota de bienvenida oficial** que guía al usuario sobre todas las funcionalidades activas de la versión.
 
 ### 3. Limpieza Total de Artefactos Nativos y Temporales
 Para eliminar residuos de compilación pesados generados por C++, Cargo (`target`) y Lua:
@@ -63,9 +70,9 @@ gradle :app:testDebugUnitTest
 
 El proyecto cuenta con pipelines de integración y entrega continua para compilación nativa en la nube:
 
-1. **Compilación Debug (`build-debug.yml`):** Configurado para ejecución manual (`workflow_dispatch`), compilando los núcleos nativos (C++, Rust y Lua) y empaquetando el APK de depuración como artefacto descargable cuando sea necesario, sin saturar ejecuciones con cada commit.
-2. **Compilación Release Beta (`build-release.yml`):** Se activa automáticamente al publicar un **Pre-Release en GitHub con etiqueta terminada en `-b`** (ej. `v0.1.0-b`) o mediante ejecución manual (`workflow_dispatch`). Compila las arquitecturas de 64 y 32 bits, firma el APK y lo adjunta directamente a la versión en GitHub. Actualmente sin ofuscación R8/ProGuard (`isMinifyEnabled = false`) para estabilidad beta.
-3. **Publicación de Changelog Beta (`process-changelog-beta.yml`):** Se activa automáticamente al detectar un **Pre-Release con sufijo `-b`** (o ejecución manual), inyectando el contenido completo de `Chanelog-beta.md` directamente en la descripción y notas de la versión en GitHub y archivándolo como respaldo.
+1. **Compilación Debug Canary (`build-debug.yml`):** Configurado para ejecución manual (`workflow_dispatch`), generando el artefacto `Keeppr-Canary-v0.1.0-dev-APK` con nombre "Keeppr Canary", suite completa de depuración y soporte de emuladores x86_64.
+2. **Compilación Release Beta (`build-release.yml`):** Se activa automáticamente al publicar un **Pre-Release en GitHub con etiqueta terminada en `-b`** (ej. `v0.1.0-b`) o mediante ejecución manual (`workflow_dispatch`). Genera el artefacto `Keeppr-v0.1.0-b-Release.apk` con nombre "Keeppr Beta", descartando al 100% arquitecturas de emulador de PC (`x86_64` y `x86`) y suprimiendo las herramientas de depuración para máxima fluidez. Actualmente sin ofuscación R8/ProGuard (`isMinifyEnabled = false`) para estabilidad beta comunitaria. Las versiones estables oficiales se integrarán más adelante en un flujo productivo independiente.
+3. **Publicación de Changelog Beta (`process-changelog-beta.yml`):** Se activa automáticamente al detectar un **Pre-Release con sufijo `-b`** (o ejecución manual), inyectando el contenido completo de `Changelog-beta.md` directamente en la descripción y notas de la versión en GitHub y archivándolo como respaldo.
 4. **Sincronización de Mensajes de Commit (`override-commit-message.yml`):** Mantiene el historial de commits alineado con el contenido de `commit_message.txt`.
 
 ### 🔑 Configuración de Secretos en GitHub (GitHub Secrets)
@@ -160,14 +167,27 @@ Para que el flujo `build-release.yml` firme el APK con tu propia clave oficial d
 
 ---
 
+11. **Sistema de Actualizaciones Desacoplado e Instalación Directa In-App:**
+    - **Script Lua 5.4 Desacoplado (`updater_config.lua`):** Centraliza las URLs de releases y la lógica de filtrado (`filter_beta_release`) directamente en un script ejecutable de Lua, desacoplando los endpoints del binario de Kotlin.
+    - **Actualización Dinámica vía GitHub Raw:** Consulta opcionalmente la versión más reciente del script de configuración en GitHub Raw para redirigir descargas o ajustar reglas sin necesidad de recompilar el APK.
+    - **Descarga Directa de APK:** Descarga fluida del paquete `.apk` a la caché interna privada con reporte de progreso en tiempo real (porcentaje y megabytes).
+    - **Instalación In-App sin Navegador:** Invoca directamente el instalador de paquetes de Android vía `FileProvider` y `REQUEST_INSTALL_PACKAGES`, permitiendo actualizar la aplicación con un solo toque sin abandonar la app ni abrir el navegador web.
+
+---
+
 ## 👥 Gobernanza y Propuestas de la Comunidad (Filosofía Anti-Bloat)
 
 Para evitar que Keeppr se convierta en una aplicación sobrecargada con herramientas innecesarias que degraden el rendimiento:
 
 - **Evolución guiada por la comunidad:** La hoja de ruta de nuevas funciones se define a partir de propuestas y votaciones de los propios usuarios.
+- **Servidor de Discord de la Comunidad (`DISCORD_CONFIG.md`):** Servidor oficial actualmente en desarrollo para coordinar la retroalimentación, reporte de errores y pruebas beta, con una estructura inicial de roles:
+  * 👑 **Creador:** Dirección general y desarrollo de la aplicación.
+  * 🧪 **Beta Tester:** Pruebas tempranas de los releases con sufijo `-b` y reporte de incidencias.
+  * 💡 **Colaborador:** Aportaciones en código, scripts de Lua o traducción.
+  * 📱 **Miembro:** Usuarios generales de la comunidad de Keeppr.
 - **Prevención de *Feature Bloat*:** No se implementan funciones superfluas en el núcleo de la aplicación; solo se integran aquellas características con demanda y utilidad contrastada.
 - **Extensibilidad mediante Lua:** Aquellas funciones especializadas o flujos de trabajo avanzados propuestos por sectores específicos de la comunidad pueden articularse como scripts y plantillas sobre el motor Lua integrado, manteniendo el núcleo Kotlin/Rust limpio, veloz y ultraligero.
-- **¿Cómo participar?:** Los usuarios pueden abrir propuestas de mejora o votar solicitudes existentes a través de los canales comunitarios del repositorio (Discussions e Issues de GitHub).
+- **¿Cómo participar?:** Los usuarios pueden abrir propuestas de mejora o votar solicitudes existentes a través de los canales comunitarios del repositorio (Discussions e Issues de GitHub) y el servidor de Discord.
 
 ---
 
@@ -183,7 +203,7 @@ Para evitar que Keeppr se convierta en una aplicación sobrecargada con herramie
 │           ├── java/com/example/ # Código Kotlin, Compose UI, ViewModels, Room DB
 │           └── res/              # Recursos visuales, temas XML y cadenas
 ├── .github/workflows/            # Flujos de CI de GitHub Actions (build-debug, build-release, process-changelog-beta, override-commit)
-├── Chanelog-beta.md               # Registro de capacidades y novedades de la versión Beta v0.1.0-b
+├── Changelog-beta.md              # Registro de capacidades y novedades de la versión Beta v0.1.0-b
 ├── commit_message.txt             # Mensaje estructurado en español sincronizado con git
 ├── setup_debug_keystore.sh       # Generador autónomo y limpio de debug.keystore
 ├── clean_native_artifacts.sh     # Script para purgar artefactos pesados (target, .cxx)

@@ -16,8 +16,9 @@ Keeppr es una aplicación móvil de notas personales de alto rendimiento, diseñ
 
 ### ⚡ 2. Rendimiento Híbrido Multi-Arquitectura
 * **Motores nativos integrados:** Núcleo de C++ y Rust enlazados directamente por JNI sin dependencias lentas de interpretación.
-* **Soporte completo para 32 y 64 bits:** Binarios nativos compilados para `arm64-v8a`, `armeabi-v7a` (compatible con Android Go) y `x86_64`.
+* **Optimización para hardware móvil real:** En el APK Release Beta se descartan las arquitecturas de emulador de PC (`x86_64`), compilando exclusivamente para procesadores de smartphones y tablets: `arm64-v8a` (64 bits) y `armeabi-v7a` (32 bits / Android Go). (La variante Canary de desarrollo conserva soporte de emuladores x86_64).
 * **Procesamiento instantáneo:** Resúmenes y conteos de texto en memoria nativa con latencia cero.
+* **100% libre de servicios privativos:** Eliminación global de Google Play Services y SDKs de Firebase/rastreadores.
 
 ### 🪄 3. Automatizaciones y Plantillas Dinámicas con Lua 5.4.6
 * **Motor Lua embebido:** Intérprete oficial de Lua 5.4.6 integrado en el pipeline nativo.
@@ -39,18 +40,42 @@ Keeppr es una aplicación móvil de notas personales de alto rendimiento, diseñ
 * **Tipografías personalizables:** Ajuste tipográfico independiente por nota (Inter, Serif, Monoespaciada, Cursiva, Sans).
 * **Modo Oscuro / Claro / Sistema:** Adaptación fluida a la preferencia del dispositivo.
 
-### 🛠️ 7. Herramientas de Diagnóstico y Rendimiento en el Móvil
-* **Diseñado para desarrollo y pruebas en smartphone:** Panel de diagnóstico interno accesible directamente desde la interfaz.
+### 🛠️ 7. Herramientas de Diagnóstico y Rendimiento (Exclusivas de Canary Debug)
+* **Diseñado para desarrollo y pruebas en smartphone:** Panel de diagnóstico interno accesible directamente desde la interfaz en la variante **Keeppr Canary** (`v0.1.0-dev`).
 * **Overlay Flotante de FPS:** Medición precisa en tiempo real de cuadros por segundo para detectar micro-tirones.
 * **Monitor de memoria JVM y Nativa:** Gráficos en vivo del consumo de RAM de la app.
 * **Visor de Logcat integrado:** Inspecciona logs del sistema sin necesidad de una computadora ni ADB.
 * **Detección de fugas:** Integración de LeakCanary en compilaciones de prueba.
+* **Aislamiento en Release Beta:** En el APK de **Keeppr Beta** (`v0.1.0-b`), todas las herramientas de depuración e interfaces de desarrollo se eliminan y desactivan por completo para ofrecer la máxima fluidez y pureza al usuario final.
+
+### 🏷️ 8. Detalle de Nomenclatura y Distribución
+* **Nombre Oficial del Archivo APK:** `Keeppr-v0.1.0-b-Release.apk`
+* **Desglose del Esquema de Nomenclatura:**
+  - `Keeppr`: Nombre de marca del proyecto.
+  - `v0.1.0`: Versión semántica base (`MAJOR.MINOR.PATCH`).
+  - `-b`: Identificador obligatorio de canal **Beta** comunitaria (Pre-Release). Permite al gestor de actualizaciones (`updater_config.lua`) y al CI reconocer entregas de prueba antes del canal estable.
+  - `-Release`: Variante de compilación para distribución en usuarios finales (desprovista de herramientas de depuración, sin dependencias de prueba como LeakCanary y firmada).
+  - `.apk`: Paquete binario estándar de Android para instalación directa fuera de tiendas privativas.
+* **Exclusión de Arquitecturas de PC:** El binario Release descarta estrictamente librerías nativas para emuladores x86/x86_64 (`lib/x86_64` y `lib/x86`), garantizando un empaquetado 100% puro para procesadores móviles (`arm64-v8a` de 64 bits y `armeabi-v7a` de 32 bits).
+* **Verificación de Integridad:** Se adjuntan sumas de verificación `SHA256SUMS.txt` en cada publicación de GitHub y canal Uptodown para comprobar que el archivo descargado no haya sufrido corrupción ni manipulación en tránsito.
+
+### ⚡ 9. Optimización Extrema de Peso con R8 y Experiencia Inicial
+* **Reducción del APK de 22 MB a ~4.45 MB:** Activación completa de R8 (`isMinifyEnabled = true`, `isShrinkResources = true`) con `proguard-android-optimize.txt`, reduciendo el peso de descarga en más del 79%.
+* **5 Pasadas de Optimización:** Inlining agresivo y fusión de clases preservando la compatibilidad absoluta con JNI nativo (`NativeEngine`), Room Database y Kotlin Coroutines.
+* **Nota de Bienvenida Oficial y Única:** Sustitución de notas de demostración por una única nota de bienvenida explicativa que detalla el uso del editor Markdown, checklists interactivas, cifrado AES-256-GCM / Argon2id, automatizaciones Lua y funcionamiento 100% local.
 
 ---
 
 ## 📋 Información de la Versión
-* **Versión:** `v0.1.0-b` (Beta)
+* **Nombre de la App (Release):** Keeppr Beta
+* **Nombre del Binario APK:** `Keeppr-v0.1.0-b-Release.apk`
+* **Tamaño del APK Release:** ~4.45 MB (optimizado con R8 y reducción de recursos)
+* **Versión de Release (Pre-Release):** `v0.1.0-b` (Beta comunitaria)
+* **Nombre de la App (Debug):** Keeppr Canary
+* **Versión de Debug (Desarrollo):** `v0.1.0-dev`
+* **Versión Estable:** Planificada para publicación oficial tras completar las fases de prueba comunitaria.
 * **Código de versión:** `1`
 * **Target SDK:** Android 14 (API 36)
 * **Min SDK:** Android 8.0 Oreo (API 26)
-* **Canal de distribución previsto:** Uptodown / Instalación directa vía APK independiente.
+* **Arquitecturas del APK Beta:** `arm64-v8a` (64 bits) y `armeabi-v7a` (32 bits / Android Go). Emuladores de PC (`x86_64` y `x86`) descartados.
+* **Canal de distribución previsto:** Uptodown / Instalación directa vía APK independiente (100% offline, sin Google Play Services).

@@ -7,13 +7,16 @@ Este documento provee el contexto técnico, limitaciones del entorno y directric
 ## 🎯 Perfil del Proyecto y del Usuario
 
 - **Propósito:** Keeppr es una aplicación de notas y bóveda local de alta velocidad escrita en Kotlin y Jetpack Compose, potenciada con un backend nativo multinúcleo en C++, Rust y Lua.
-- **Versión Oficial Actual:** `v0.1.0-b` (Beta) orientada a pruebas comunitarias y distribución en APK independiente.
-- **Identidad e Identificador de Paquete:** Su nombre público es **Keeppr** y su `applicationId` es `com.keeppr.notes`, garantizando almacenamiento limpio y profesional en `Android/data/com.keeppr.notes` sin dependencias ni referencias externas.
+- **Nombres y Versiones Diferenciadas por Canal:**
+  * **Canary (Desarrollo / Debug):** "Keeppr Canary", versión `v0.1.0-dev`. Conserva la suite de depuración in-app completa y arquitecturas móviles y emuladores (`arm64-v8a`, `armeabi-v7a`, `x86_64`).
+  * **Beta (Pre-Release / Release):** "Keeppr Beta", versión `v0.1.0-b`. Descartadas las arquitecturas de emulador de PC (`x86_64`), empaquetando exclusivamente para procesadores móviles (`arm64-v8a` y `armeabi-v7a`). Se eliminan y suprimen por completo todas las herramientas de depuración para máxima fluidez.
+  * **Versión Estable:** Se publicará en un flujo oficial independiente una vez completada la fase de pruebas y validación comunitaria.
+- **Identidad e Identificador de Paquete:** Su nombre base es **Keeppr** y su `applicationId` es `com.keeppr.notes`, garantizando almacenamiento limpio y profesional en `Android/data/com.keeppr.notes` sin dependencias ni referencias externas.
 - **Icono de Lanzador:** Icono adaptativo basado en una libreta/cuaderno de tapa dura personal con banda elástica vertical (estilo Moleskine), optimizado en formato WebP de máxima calidad y alta compresión (`ic_keeppr_logo.webp`), administrable mediante el script autónomo `convert_jpg_to_webp.sh`.
 - **Perfil del Usuario:** El usuario opera y prueba desde un dispositivo móvil/teléfono sin acceso a una estación de trabajo PC tradicional. Por ello, todos los comandos, scripts y salidas deben ser directos, robustos y sin fricciones.
-- **Canal de Distribución:** La aplicación se distribuye como APK independiente en tiendas alternativas (Uptodown, APKMirror, F-Droid) y descarga directa, **no** en Google Play. No deben agregarse dependencias restrictivas a Google Play Services ni flujos de facturación privativos.
+- **Canal de Distribución y Cero Dependencias de Google:** La aplicación se distribuye como APK independiente en tiendas alternativas (Uptodown, APKMirror, F-Droid) y descarga directa, **no** en Google Play. Se han eliminado globalmente todas las dependencias y plugins de Google Play Services, Firebase y rastreadores de terceros, asegurando un funcionamiento 100% desconectado, privado y soberano.
 - **Tolerancia al Tamaño del APK:** Al usuario no le preocupa el peso final del APK siempre y cuando las dependencias sean 100% funcionales y completas. Debe evitarse la implementación de soluciones caseras incompletas o fallbacks degradados cuando existan librerías y dependencias sólidas.
-- **Entorno de Depuración en el Teléfono (In-App Debugging):** Dado que el usuario opera sin PC, todas las herramientas de telemetría y diagnóstico deben estar integradas visualmente en la propia aplicación (Overlay HUD flotante arrastrable de FPS, memoria JVM y Heap nativo de C++/Rust, visor de hilos en tiempo real, lector de Logcat embebido y detección automática de fugas de memoria con LeakCanary v2.14).
+- **Entorno de Depuración en el Teléfono (In-App Debugging en Canary):** Para el desarrollo en el teléfono sin PC, la variante Canary incluye herramientas de telemetría y diagnóstico integradas visualmente en la propia aplicación (Overlay HUD flotante arrastrable de FPS, memoria JVM y Heap nativo de C++/Rust, visor de hilos en tiempo real, lector de Logcat embebido y detección automática de fugas de memoria con LeakCanary v2.14). En el APK Release Beta estas herramientas quedan estrictamente desactivadas y ocultas.
 - **Filosofía de Desarrollo Anti-Bloat (Comunidad al Mando):** La evolución funcional está guiada directamente por las propuestas de la comunidad para evitar saturar la app con funciones superfluas que casi nadie usará. Las funciones añadidas deben responder a necesidades reales votadas por usuarios. La personalización visual (selección de modo claro/oscuro/sistema, soporte opcional para colores dinámicos Material You en Android 12+, paletas de acento personalizadas, 5 tipografías aplicables de forma individual por nota o a fragmentos específicos de texto mediante etiquetas inline) y la extensibilidad mediante Lua son ejemplos de funciones con alto valor utilitario sin recargar el núcleo.
 
 ---
@@ -33,12 +36,17 @@ Este documento provee el contexto técnico, limitaciones del entorno y directric
 - **Importación y Exportación Universal:**
   - *Exportación:* Modo Markdown (.md) plano universal para sincronización con Obsidian/Notion/PC, y modo Paquete de Bóveda (.zip) con `note.md`, `vault_meta.json` (metadatos completos y tipografía asignada) y `signature.vault` (firma SHA-256 nativa).
   - *Importación:* Soporta archivos `.md`, `.txt` y paquetes `.zip` con verificación automática de firma para garantizar la autenticidad e integridad de la nota importada.
+- **Sistema de Actualizaciones Desacoplado e Instalación Directa In-App:**
+  - *Script Lua 5.4 (`updater_config.lua`):* Centraliza la configuración de repositorio (`LuisAlejandro544/Keeppr`), endpoints de GitHub Releases API y la función nativa `filter_beta_release(tag_name, is_prerelease)` para aceptar estrictamente pre-releases con sufijo `-b`.
+  - *Carga Dinámica y Contingencia:* Soporte para consulta de GitHub Raw (`updater_config.lua`) para cambiar URLs de releases en caliente sin recompilar el APK, con contingencia empaquetada en `assets/updater_config.lua`.
+  - *Descarga e Instalación In-App:* `AppUpdateManager` descarga el archivo APK directamente a la memoria interna privada (`cacheDir/updates/`) reportando progreso en tiempo real y desencadena el instalador de paquetes de Android vía `FileProvider` y `REQUEST_INSTALL_PACKAGES`, sin requerir navegador web externo.
 - **Integridad del Pipeline de Compilación y CI/CD:**
   - C++, Rust y Lua están integrados de forma obligatoria en Gradle y CMake. Si se solicitan nuevas funciones nativas, deben implementarse respetando esta cadena de herramientas sin omitirlas ni sustituirlas por soluciones simuladas en Kotlin.
-  - Flujo `build-release.yml` en GitHub Actions para compilación de APKs Release, disparado ante Pre-Releases con etiqueta terminada en `-b` (ej. `v0.1.0-b`). Sin ofuscación R8/ProGuard (`isMinifyEnabled = false`) para estabilidad en la beta.
+  - Flujo `build-release.yml` en GitHub Actions para compilación de APKs Release, disparado ante Pre-Releases con etiqueta terminada en `-b` (ej. `v0.1.0-b`). Con ofuscación y minificación R8/ProGuard activada (`isMinifyEnabled = true`, `isShrinkResources = true`) con reglas estrictas de preservación JNI nativo en `proguard-rules.pro`, reduciendo el peso final del APK de ~22 MB a ~4.45 MB.
   - Gestión de credenciales de firma vía GitHub Secrets (`RELEASE_KEYSTORE_BASE64`, `RELEASE_STORE_PASSWORD`, `RELEASE_KEY_ALIAS`, `RELEASE_KEY_PASSWORD`).
-  - Flujo `process-changelog-beta.yml` que inyecta automáticamente el contenido de `Chanelog-beta.md` en la descripción del Pre-Release con etiqueta `-b`.
+  - Flujo `process-changelog-beta.yml` que inyecta automáticamente el contenido de `Changelog-beta.md` en la descripción del Pre-Release con etiqueta `-b`.
   - Flujo `build-debug.yml` ejecutado exclusivamente de forma manual (`workflow_dispatch`) para evitar compilaciones automáticas por commit.
+  - Experiencia inicial de la app limpia: sustitución de notas de prueba pre-hechas por una única nota estructurada de bienvenida oficial en `AppDatabase.kt`.
 
 ---
 

@@ -6,6 +6,20 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_C_STANDARD 11)
 
+# Banderas de optimización extrema de tamaño y descarte de símbolos para C/C++ y Lua
+add_compile_options(
+    -Oz
+    -fdata-sections
+    -ffunction-sections
+    -fvisibility=hidden
+    $<$<COMPILE_LANGUAGE:CXX>:-fvisibility-inlines-hidden>
+)
+
+add_link_options(
+    -Wl,--gc-sections
+    -Wl,--exclude-libs,ALL
+)
+
 # Lua C Source Files (Original official Lua 5.4.6 C implementation)
 set(LUA_SOURCES
     lua/lapi.c

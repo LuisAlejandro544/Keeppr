@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import android.net.Uri
+import com.example.BuildConfig
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -178,15 +179,17 @@ fun NotesListScreen(
                         )
                     }
 
-                    IconButton(
-                        onClick = onOpenDebugDashboard,
-                        modifier = Modifier.testTag("debug_dashboard_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.BugReport,
-                            contentDescription = "Panel de Debug",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
+                    if (BuildConfig.DEBUG) {
+                        IconButton(
+                            onClick = onOpenDebugDashboard,
+                            modifier = Modifier.testTag("debug_dashboard_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.BugReport,
+                                contentDescription = "Panel de Debug",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
 
                     IconButton(

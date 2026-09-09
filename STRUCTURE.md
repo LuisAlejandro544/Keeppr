@@ -38,6 +38,8 @@ Este documento detalla el árbol de directorios, la organización de módulos y 
 │       │   │   │       └── NoteRepository.kt # Abstracción del acceso a datos
 │       │   │   ├── native/
 │       │   │   │   └── NativeEngine.kt    # Fachada Kotlin para invocar métodos JNI (Rust, C++, Lua, Criptografía AES/PBKDF2)
+│       │   │   ├── updater/               # Sistema de Actualizaciones Desacoplado
+│       │   │   │   └── AppUpdateManager.kt # Gestor reactivo de comprobación, descarga directa de APKs e instalación in-app
 │       │   │   ├── debug/                 # Módulo de Monitoreo y Diagnóstico en Vivo
 │       │   │   │   ├── PerformanceMonitor.kt # Monitor en tiempo real de FPS (Choreographer), RAM (JVM y Heap Nativo) e hilos
 │       │   │   │   └── InAppLogCollector.kt  # Colector en tiempo real de logs del proceso (Logcat) con filtros
@@ -77,7 +79,9 @@ Este documento detalla el árbol de directorios, la organización de módulos y 
 ├── build.gradle.kts                       # Configuración raíz de Gradle
 ├── settings.gradle.kts                    # Registro de módulos y repositorios Maven
 ├── .github/workflows/                     # Flujos automatizados CI/CD (build-debug, build-release, process-changelog-beta, override-commit)
-├── Chanelog-beta.md                       # Registro de capacidades y novedades de la versión Beta v0.1.0-b
+├── updater_config.lua                     # Script oficial de Lua 5.4 con URLs, endpoints y filtrado de pre-releases beta
+├── DISCORD_CONFIG.md                      # Estructura de roles y configuración de la comunidad de Discord
+├── Changelog-beta.md                      # Registro de capacidades y novedades de la versión Beta v0.1.0-b
 ├── commit_message.txt                     # Mensaje de confirmación sincronizado en español
 ├── setup_debug_keystore.sh                # Generador forzado y limpio de debug.keystore sin dependencias
 ├── clean_native_artifacts.sh              # Script Bash para purgar artefactos de compilación (target, .cxx, etc.)
@@ -116,11 +120,20 @@ Este documento detalla el árbol de directorios, la organización de módulos y 
 - **`NotesViewModel`**: Maneja el estado de la UI (`StateFlow`) desacoplado del ciclo de vida de la actividad, persistiendo en tiempo real temas visuales, modo de vista y consultas. Administra la sesión efímera en memoria de la contraseña activa (`activeNoteSessionPassword`), realiza cifrado/descifrado transparente al persistir o desbloquear notas, y excluye notas protegidas de las búsquedas de texto.
 
 ### 4. Capa de Diagnóstico y Depuración en Tiempo Real (`app/src/main/java/com/example/debug` y `ui/debug`)
-- **`PerformanceMonitor`**: Muestrea FPS mediante `Choreographer`, calcula memoria JVM libre/usada y rastrea el uso de memoria nativa C++/Rust mediante `Debug.getNativeHeapAllocatedSize()`.
-- **`InAppLogCollector`**: Captura en tiempo real la salida de Logcat del proceso para auditar eventos sin conectar el teléfono a un PC.
-- **`PerformanceFloatingHud`**: Overlay arrastrable con respuesta háptica para visualización continua de FPS, memoria e hilos sobre cualquier vista de la app.
-- **`DebugDashboardDialog`**: Panel modal con 4 pestañas interactivas: métricas de rendimiento y GC manual, visor e inspector de hilos activos, consola de logs en vivo y estado del hardware y enlaces nativos (C++, Lua, Rust).
-- **LeakCanary (v2.14)**: Detección automatizada de fugas de memoria configurada en Gradle sin intervención manual.
+- **Aislamiento Condicional y Exclusividad Canary (`v0.1.0-dev`):** Esta suite de depuración opera **exclusivamente en la variante Debug / Canary**. En el APK Release Beta (`v0.1.0-b`), todos los monitores de fondo, el HUD flotante, el panel de control y los accesos visuales se desactivan y suprimen por completo mediante `BuildConfig.DEBUG`, eliminando cualquier sobrecarga de rendimiento o interfaz de desarrollo para los usuarios finales.
+- **`PerformanceMonitor`**: Muestrea FPS mediante `Choreographer`, calcula memoria JVM libre/usada y rastrea el uso de memoria nativa C++/Rust mediante `Debug.getNativeHeapAllocatedSize()` (activo solo en debug).
+- **`InAppLogCollector`**: Captura en tiempo real la salida de Logcat del proceso para auditar eventos sin conectar el teléfono a un PC (activo solo en debug).
+- **`PerformanceFloatingHud`**: Overlay arrastrable con respuesta háptica para visualización continua de FPS, memoria e hilos sobre cualquier vista de la app (exclusivo debug).
+- **`DebugDashboardDialog`**: Panel modal con 4 pestañas interactivas: métricas de rendimiento y GC manual, visor e inspector de hilos activos, consola de logs en vivo y estado del hardware y enlaces nativos (exclusivo debug).
+- **LeakCanary (v2.14)**: Detección automatizada de fugas de memoria configurada en Gradle mediante `debugImplementation`, quedando 100% fuera del empaquetado de Release Beta.
+- **Pureza de Dependencias y Nomenclatura:** El proyecto está completamente libre de dependencias de Google Play Services y rastreadores de Firebase, garantizando que el APK sea distribuible en Uptodown y tiendas libres con absoluta soberanía y privacidad. En Release Beta se descartan emuladores de PC (`x86_64` y `x86`), generando el archivo oficial `Keeppr-v0.1.0-b-Release.apk` optimizado para procesadores móviles (`arm64-v8a` y `armeabi-v7a`).
+- **Optimización Agresiva con R8 / ProGuard (`app/proguard-rules.pro`):** Minificación activada con reducción de recursos (`isShrinkResources = true`) y `proguard-android-optimize.txt`, reduciendo el peso de descarga del APK final de ~22 MB a tan solo ~4.45 MB (-79%) mientras preserva 100% intactos los enlaces JNI nativos de Rust/C++ (`com.example.native.NativeEngine`) y las entidades de Room.
+- **Experiencia Inicial Limpia (`AppDatabase.kt`):** Se erradicaron notas de prueba pre-hechas, inicializando la base de datos local con una única nota oficial de bienvenida que explica detalladamente las funciones disponibles y el uso de Keeppr.
+
+### 5. Capa de Actualizaciones Desacopladas (`app/src/main/java/com/example/updater` y `updater_config.lua`)
+- **`updater_config.lua`**: Script oficial en Lua 5.4 desacoplado del binario Kotlin. Define repositorios, endpoints de la API de GitHub Releases (`LuisAlejandro544/Keeppr`) y la función nativa `filter_beta_release(tag_name, is_prerelease)` para aceptar estrictamente pre-releases beta con sufijo `-b`.
+- **`AppUpdateManager.kt`**: Orquesta la consulta de actualizaciones ejecutando el script Lua a través de JNI (`NativeEngine.evalLua`). Permite la actualización dinámica del script desde GitHub Raw sin recompilar el APK.
+- **Descarga Directa e Instalación In-App**: Descarga el archivo APK en `cacheDir/updates/` reportando métricas de progreso (MB y porcentaje) e interactúa directamente con el instalador de paquetes de Android vía `FileProvider` y `REQUEST_INSTALL_PACKAGES`, eliminando la necesidad de recurrir al navegador web.
 
 ---
 

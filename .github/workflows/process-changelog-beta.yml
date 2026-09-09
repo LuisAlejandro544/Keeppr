@@ -19,31 +19,31 @@ jobs:
       - name: 1. Descargar repositorio
         uses: actions/checkout@v4
 
-      - name: 2. Verificar existencia y contenido de Chanelog-beta.md
+      - name: 2. Verificar existencia y contenido de Changelog-beta.md
         run: |
-          echo "=== Inspeccionando Chanelog-beta.md ==="
-          if [ -f "Chanelog-beta.md" ]; then
-            echo "✅ Archivo Chanelog-beta.md encontrado."
+          echo "=== Inspeccionando Changelog-beta.md ==="
+          if [ -f "Changelog-beta.md" ]; then
+            echo "✅ Archivo Changelog-beta.md encontrado."
             echo "--------------------------------------------------"
-            cat Chanelog-beta.md
+            cat Changelog-beta.md
             echo "--------------------------------------------------"
           else
-            echo "❌ Error: Chanelog-beta.md no existe en la raíz del repositorio."
+            echo "❌ Error: Changelog-beta.md no existe en la raíz del repositorio."
             exit 1
           fi
 
-      - name: 3. Publicar contenido de Chanelog-beta.md en la descripción del Pre-Release
+      - name: 3. Publicar contenido de Changelog-beta.md en la descripción del Pre-Release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.release.tag_name }}
-          body_path: Chanelog-beta.md
+          body_path: Changelog-beta.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 4. Subir Chanelog-beta.md como artefacto de respaldo
+      - name: 4. Subir Changelog-beta.md como artefacto de respaldo
         uses: actions/upload-artifact@v4
         with:
-          name: Keeppr-Chanelog-Beta
-          path: Chanelog-beta.md
+          name: Keeppr-Changelog-Beta
+          path: Changelog-beta.md
           if-no-files-found: error

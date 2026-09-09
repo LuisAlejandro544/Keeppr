@@ -1,27 +1,52 @@
-ci(release): configurar workflow de compilación release para pre-releases beta v0.1.0-b y procesamiento de changelog
+feat(updater): incorporar sistema de actualizaciones desacoplado con script nativo de Lua y descarga directa in-app de APKs Beta
 
-- Pipeline de CI/CD para APK de Release (`.github/workflows/build-release.yml`):
-  * Automatización de compilación de APK en modo Release activada exclusivamente al detectar eventos de Pre-Release de GitHub con etiqueta terminada en sufijo `-b` (ej. `v0.1.0-b`) o mediante ejecución manual (`workflow_dispatch`).
-  * Entorno de compilación hermético: Java 17 Temurin, Toolchain de Rust (stable) con targets nativos para arquitecturas Android de 64 bits (`aarch64-linux-android`, `x86_64-linux-android`) y 32 bits (`armv7-linux-androideabi`), CMake 3.22.1 y NDK 26.1.10909125.
-  * Inyección segura de credenciales de firma mediante GitHub Secrets (`RELEASE_KEYSTORE_BASE64`, `RELEASE_STORE_PASSWORD`, `RELEASE_KEY_ALIAS`, `RELEASE_KEY_PASSWORD`) con decodificación al vuelo y generación de clave de contingencia autofirmada para evitar fallos de compilación si los secretos aún no han sido cargados.
-  * Compilación con `./gradlew assembleRelease` sin caché ni daemon; R8/ProGuard deshabilitado temporalmente (`isMinifyEnabled = false`) para garantizar estabilidad durante el ciclo inicial de pruebas beta.
-  * Publicación automática del artefacto (`Keeppr-Release-Beta-v0.1.0-b-APK`) y adjuntado directo del archivo APK generado a la pre-release de GitHub mediante `action-gh-release`.
+- Motor de Configuración y Filtrado Dinámico de Releases en Lua 5.4 (`updater_config.lua` y `assets/updater_config.lua`):
+  * Creado script desacoplado en Lua 5.4.6 que centraliza las URLs del repositorio (LuisAlejandro544/Keeppr), endpoints de GitHub Releases API (`https://api.github.com/repos/LuisAlejandro544/Keeppr/releases`) y enlace remoto en GitHub Raw.
+  * Implementada función lógica nativa `filter_beta_release(tag_name, is_prerelease)` para filtrar estrictamente pre-releases de GitHub con sufijo `-b` (ej. `v0.1.0-b`, `v0.1.1-b`).
+  * Implementada función de comparación de versiones `is_newer_version(current_tag, remote_tag)` y serialización a JSON para interoperabilidad de alto rendimiento con Kotlin y JNI (`NativeEngine.evalLua`).
+  * Script respaldado tanto en la raíz del repositorio para lectura dinámica vía GitHub Raw como empaquetado en assets locales de la aplicación para disponibilidad fuera de línea.
 
-- Automatización de registro de cambios Beta (`.github/workflows/process-changelog-beta.yml`):
-  * Creado flujo de publicación para `Chanelog-beta.md`, activado exclusivamente ante pre-releases con sufijo `-b` o manualmente (`workflow_dispatch`).
-  * Inyección automática del contenido íntegro del changelog en las notas de la pre-release en GitHub mediante `softprops/action-gh-release@v2`.
+- Gestor de Actualizaciones en Segundo Plano y Descarga Directa de APK (`AppUpdateManager.kt`):
+  * Implementado gestor reactivo mediante Kotlin Coroutines, Flow y OkHttp que consulta la API de GitHub Releases sin intermediarios de terceros.
+  * Descarga directa y fluida del archivo APK (.apk) a la memoria caché interna (`cacheDir/updates/`) reportando porcentaje y megabytes descargados en tiempo real (evita redirigir al navegador externo).
+  * Integración con Android FileProvider (`androidx.core.content.FileProvider`) e intent seguro `application/vnd.android.package-archive` con `FLAG_GRANT_READ_URI_PERMISSION`.
+  * Verificación y solicitud del permiso `REQUEST_INSTALL_PACKAGES` en Android 8.0+ (API 26+) para permitir la instalación directa del APK descargado desde la propia interfaz de la aplicación.
 
-- Optimización del pipeline de depuración (`.github/workflows/build-debug.yml`):
-  * Flujo de compilación de APK Debug configurado para ejecución exclusivamente manual (`workflow_dispatch`), evitando consumo innecesario de minutos y ejecuciones automáticas en cada commit o pull request.
+- Interfaz de Usuario y Flujo de Actualización en Ajustes (`SettingsDialog.kt`, `NotesViewModel.kt`, `MainActivity.kt`):
+  * Nueva sección interactiva en el diálogo de Ajustes: "Actualizaciones (Canal Beta -b)".
+  * Estados visuales completos con Material Design 3: inactivo, comprobando con motor nativo Lua, al día, nueva versión beta disponible con notas de la versión, barra de progreso de descarga y botón de instalación inmediata.
+  * Soporte completo de accesibilidad y etiquetas de prueba `testTag("check_updates_button")`, `testTag("download_apk_button")`, `testTag("install_apk_button")`.
 
-- Limpieza de interfaz de usuario en pantalla principal (`NotesListScreen.kt`):
-  * Eliminado el diálogo flotante redundante de prueba "Motores Nativos" y su botón con icono de chip en la barra superior de la lista de notas.
-  * Se mantiene la ejecución y automatización con Lua 5.4.6 en el editor de notas (`NoteEditorScreen`), donde cumple su función real para plantillas y transformaciones de texto.
+- Configuración de Permisos y Proveedor de Archivos (`AndroidManifest.xml` y `res/xml/file_paths.xml`):
+  * Declarados permisos de red e instalación: `INTERNET`, `ACCESS_NETWORK_STATE` y `REQUEST_INSTALL_PACKAGES`.
+  * Configurado `FileProvider` con la ruta segura `@xml/file_paths` apuntando a las subcarpetas privadas de caché y archivos de actualización.
 
-- Registro de capacidades y versión oficial Beta (`Chanelog-beta.md` y `app/build.gradle.kts`):
-  * Creado el documento `Chanelog-beta.md` detallando las 7 columnas funcionales de Keeppr: cifrado criptográfico AES-256 + PBKDF2 en Rust/C++, soporte multiarquitectura de 32/64 bits, automatización con Lua 5.4.6, editor Markdown táctil, gestión de bóvedas y exportación abierta (.zip/.md), theming Material 3 con colores dinámicos y herramientas de telemetría móvil (FPS HUD, monitor de memoria y visor Logcat).
-  * Actualizada la versión oficial de la aplicación a `versionName = "0.1.0-b"` con `versionCode = 1` en `app/build.gradle.kts`.
-  * Habilitada la variable de entorno `KEY_ALIAS` en el bloque de `signingConfigs.release`.
+- Documentación de la Comunidad y Roles de Discord (`DISCORD_CONFIG.md`):
+  * Estructurada la configuración inicial del servidor de Discord de la comunidad en desarrollo, definiendo la jerarquía y permisos de roles: 👑 Creador, 🧪 Beta Tester, 💡 Colaborador y 📱 Miembro.
 
-- Documentación del repositorio actualizada:
-  * Actualizados `README.md`, `ROADMAP.md`, `STRUCTURE.md` y `AI_CONTEXT.md` reflejando la transición a la fase Beta v0.1.0-b, la guía de configuración de GitHub Secrets para la firma de APKs de release y el nuevo flujo de trabajo para pre-releases.
+- Refinamiento de Pipeline Release y Nomenclatura Oficial de APK (`build-release.yml`, `app/build.gradle.kts`):
+  * Estandarizado el nombre del archivo APK release a `Keeppr-v0.1.0-b-Release.apk` tanto en la tarea de empaquetado de Gradle como en los artefactos de GitHub Actions y publicaciones de Pre-Release.
+  * Exclusión estricta de librerías nativas para emuladores de PC (`lib/x86_64` y `lib/x86`) en la variante Release Beta mediante `androidComponents.packaging.jniLibs.excludes`, filtros NDK/CMake y tareas de saneamiento en Gradle, garantizando un empaquetado 100% puro para procesadores móviles (`arm64-v8a` y `armeabi-v7a`).
+  * Generación y carga automática del archivo de sumas de comprobación criptográficas `SHA256SUMS.txt` para verificación de integridad en descargas offline y Uptodown.
+
+- Corrección de Nomenclatura del Changelog y Documentación de la Versión (`Changelog-beta.md`):
+  * Corregido el nombre del archivo de registro a `Changelog-beta.md` y actualizadas todas sus referencias en flujos de CI (`process-changelog-beta.yml`, `build-release.yml`), script Lua (`updater_config.lua`) y documentación.
+  * Integrada la sección oficial de "Detalle de Nomenclatura y Distribución" desglosando el esquema `Keeppr-v0.1.0-b-Release.apk`.
+  * Actualizadas las especificaciones en `STRUCTURE.md`, `ROADMAP.md`, `README.md` y `AI_CONTEXT.md`.
+
+- Optimización Agresiva de Peso con R8 / ProGuard (`app/build.gradle.kts`, `app/proguard-rules.pro`, `gradle.properties`):
+  * Habilitada la minificación de bytecode (`isMinifyEnabled = true`) y la reducción de recursos XML y gráficos no utilizados (`isShrinkResources = true`) junto a `proguard-android-optimize.txt` en la variante Release.
+  * Diseñadas reglas de protección y optimización en `proguard-rules.pro` con 5 pasadas de optimización (`-optimizationpasses 5`), relajación de acceso para inlining profundo (`-allowaccessmodification`), remoción completa de llamadas `android.util.Log` en producción y protección inviolable de símbolos JNI (`NativeEngine`), modelos de datos y Room Database.
+  * Reducción drástica del peso del APK de ~22 MB a tan solo ~4.45 MB (un ahorro de más del 79% en tamaño de descarga para usuarios de telefonía móvil).
+
+- Experiencia de Inicio y Nota de Bienvenida Oficial (`AppDatabase.kt`):
+  * Depuradas las notas prefabricadas del arranque inicial, reemplazándolas por una única nota limpia y completa de bienvenida a Keeppr.
+  * Sintetizadas las capacidades funcionales disponibles al momento: edición Markdown en tiempo real, listas de verificación interactivas en vista previa, cifrado criptográfico local con Rust (AES-256-GCM / Argon2id), búsqueda indexada de alta velocidad, ejecución de scripts Lua 5.4.6 y portabilidad en bóvedas `.vault`.
+
+- Optimización Nativa Ultra-Compacta y Empaquetado Agresivo (`Cargo.toml`, `CMakeLists.txt`, `app/build.gradle.kts`, `proguard-rules.pro`):
+  * Perfil de reducción en Rust (`Cargo.toml`): configurado `[profile.release]` con `opt-level = "z"`, `lto = true`, `codegen-units = 1`, `panic = "abort"` y `strip = true`, activando optimizaciones de tiempo de enlace (LTO) y descarte de tablas de desenrollado de pánico.
+  * Banderas ultra-compactas en C++ y Lua (`CMakeLists.txt`): incorporadas banderas Clang `-Oz`, `-fdata-sections`, `-ffunction-sections`, `-fvisibility=hidden`, `-fvisibility-inlines-hidden`, y descarte de secciones enlazador `-Wl,--gc-sections`, ocultando símbolos internos de Lua y C++ de la tabla dinámica mientras se preservan exports JNI.
+  * Nombres y empaquetado agresivo en R8 (`app/proguard-rules.pro`): aplicadas directivas `-repackageclasses ''` y `-overloadaggressively` para compactar las rutas de clases al paquete raíz y reutilizar identificadores de métodos cortos.
+  * Exclusión de metadatos y licencias residuales (`app/build.gradle.kts`): purgados archivos `META-INF/LICENSE*`, `META-INF/NOTICE*`, `META-INF/*.version`, `META-INF/androidx/**` y licencias no requeridas en tiempo de ejecución.
+  * Reducción total del binario universal `Keeppr-v0.1.0-b-Release.apk`: reducido de ~4.45 MB a tan solo **~3.4 MB** (ahorro global superior al 84% respecto a los ~22 MB originales sin optimizar).
+

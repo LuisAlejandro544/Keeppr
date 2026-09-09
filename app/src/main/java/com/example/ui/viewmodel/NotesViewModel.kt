@@ -14,6 +14,10 @@ import com.example.ui.markdown.MarkdownParser
 import com.example.ui.theme.AppAccentPalette
 import com.example.ui.theme.AppFontTheme
 import com.example.ui.theme.AppThemeMode
+import com.example.updater.AppUpdateManager
+import com.example.updater.BetaReleaseInfo
+import com.example.updater.UpdateStatus
+import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -94,6 +98,45 @@ class NotesViewModel(
     fun setAccentPalette(palette: AppAccentPalette) {
         _accentPalette.value = palette
         prefs?.edit()?.putString("selected_accent_palette", palette.id)?.apply()
+    }
+
+    // Gestor de actualizaciones nativo desacoplado mediante script de Lua 5.4
+    private val updateManager: AppUpdateManager? =
+        context?.let { AppUpdateManager(it.applicationContext) }
+
+    val updateStatus: StateFlow<UpdateStatus> =
+        updateManager?.status ?: MutableStateFlow(UpdateStatus.Idle).asStateFlow()
+
+    /**
+     * Consulta actualizaciones utilizando el motor Lua y la API de GitHub Releases.
+     */
+    fun checkForUpdates(currentVersion: String) {
+        viewModelScope.launch {
+            updateManager?.checkForUpdates(currentVersion)
+        }
+    }
+
+    /**
+     * Descarga el APK directamente en la caché privada de la app reportando progreso.
+     */
+    fun downloadApk(releaseInfo: BetaReleaseInfo) {
+        viewModelScope.launch {
+            updateManager?.downloadApk(releaseInfo)
+        }
+    }
+
+    /**
+     * Invoca el instalador de paquetes de Android para instalar el APK sin salir a navegadores externos.
+     */
+    fun installApk(activityContext: Context, apkFile: File) {
+        updateManager?.installApk(activityContext, apkFile)
+    }
+
+    /**
+     * Restablece el estado de actualización tras finalizar o descartar.
+     */
+    fun resetUpdateStatus() {
+        updateManager?.resetStatus()
     }
 
     private var saveJob: Job? = null

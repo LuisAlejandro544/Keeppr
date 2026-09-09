@@ -1,5 +1,24 @@
 name: Build Release APK (Beta)
 
+# ==============================================================================
+# DECLARACIÓN DEL CANAL: VERSIÓN BETA (Pre-Release v0.1.0-b)
+#
+# Estado del Proyecto:
+# - Lo que tenemos actualmente es el canal BETA ("Keeppr Beta" v0.1.0-b).
+# - Este canal está enfocado en pruebas comunitarias, feedback y distribución
+#   en Uptodown y tiendas independientes de terceros.
+# - Más adelante, una vez concluido el ciclo de validación comunitaria, se
+#   incorporará el pipeline para la versión ESTABLE oficial definitiva.
+#
+# Optimizaciones del APK Release Beta:
+# - Se descartan las arquitecturas de emulador de PC (x86_64), compilando
+#   exclusivamente para dispositivos móviles reales: arm64-v8a (64 bits) y
+#   armeabi-v7a (32 bits / Android Go).
+# - Se eliminan y desactivan todas las herramientas de depuración in-app
+#   (LeakCanary, HUD de FPS/memoria, visor de hilos y consola Logcat).
+# - 100% libre de dependencias de Google Play Services y rastreadores.
+# ==============================================================================
+
 on:
   release:
     types: [prereleased]
@@ -25,11 +44,12 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: 3. Configurar Toolchain de Rust y arquitecturas nativas (64 y 32 bits)
+      - name: 3. Configurar Toolchain de Rust para arquitecturas móviles (64 y 32 bits, sin emuladores de PC)
         run: |
           rustup toolchain install stable --profile minimal
           rustup default stable
-          rustup target add aarch64-linux-android x86_64-linux-android armv7-linux-androideabi
+          # En Release Beta se descartan arquitecturas de emulador de PC (x86_64), enfocando en procesadores móviles reales:
+          rustup target add aarch64-linux-android armv7-linux-androideabi
           echo "Rust version:"
           rustc --version
           cargo --version
@@ -97,24 +117,59 @@ jobs:
           fi
           chmod +x ./gradlew
 
-      - name: 8. Compilar APK Release (C++ + Rust + Lua + Kotlin, SIN R8/Proguard, SIN CACHE)
+      - name: 8. Compilar APK Release Beta (C++ + Rust + Lua + Kotlin, SIN herramientas de depuración, SIN R8, SIN CACHE)
         run: |
           ./gradlew assembleRelease \
             --no-build-cache \
             --no-daemon \
             --stacktrace
 
-      - name: 9. Subir APK Release generado como artefacto descargable
+      - name: 8.1. Verificar arquitectura pura y nombre oficial del APK Release
+        run: |
+          echo "=== Verificando APK generado ==="
+          RELEASE_DIR="app/build/outputs/apk/release"
+          ls -la "$RELEASE_DIR"
+          
+          APK_FILE="$RELEASE_DIR/Keeppr-v0.1.0-b-Release.apk"
+          if [ ! -f "$APK_FILE" ]; then
+            FIRST_APK=$(find "$RELEASE_DIR" -name "*.apk" | head -n 1)
+            if [ -n "$FIRST_APK" ]; then
+              echo "-> Copiando $FIRST_APK a $APK_FILE"
+              cp "$FIRST_APK" "$APK_FILE"
+            else
+              echo "❌ Error: No se encontró ningún APK en $RELEASE_DIR"
+              exit 1
+            fi
+          fi
+
+          echo "=== Inspeccionando librerías nativas dentro del APK ==="
+          unzip -l "$APK_FILE" "lib/*" || true
+
+          echo "=== Asegurando exclusión estricta de arquitecturas de PC ==="
+          zip -d "$APK_FILE" "lib/x86_64/*" "lib/x86/*" || true
+
+          echo "=== Generando suma de verificación SHA-256 ==="
+          cd "$RELEASE_DIR"
+          sha256sum "Keeppr-v0.1.0-b-Release.apk" > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: 9. Subir APK Release Beta generado como artefacto descargable
         uses: actions/upload-artifact@v4
         with:
           name: Keeppr-Release-Beta-v0.1.0-b-APK
-          path: app/build/outputs/apk/release/*.apk
+          path: |
+            app/build/outputs/apk/release/Keeppr-v0.1.0-b-Release.apk
+            app/build/outputs/apk/release/SHA256SUMS.txt
           if-no-files-found: error
 
-      - name: 10. Publicar y adjuntar APK a la Pre-Release de GitHub
+      - name: 10. Publicar y adjuntar APK a la Pre-Release de GitHub (Canal Beta)
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: app/build/outputs/apk/release/*.apk
+          files: |
+            app/build/outputs/apk/release/Keeppr-v0.1.0-b-Release.apk
+            app/build/outputs/apk/release/SHA256SUMS.txt
+          body_path: Changelog-beta.md
+          prerelease: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
