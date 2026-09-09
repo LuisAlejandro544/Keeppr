@@ -1,15 +1,19 @@
-feat/refactor: personalización de tipografía por nota y por fragmento de texto (inline) en lugar de ajuste global
+feat(ui): restringir selector de fuentes al editor y permitir tipografías por nota y fragmentos
 
-- Migrado el selector de tipografías desde un estado global en SharedPreferences hacia un modelo granular por nota y por fragmentos de texto seleccionados:
-  * Entidad `Note` actualizada con el campo `fontTheme` y migración de base de datos Room (`MIGRATION_1_2` en `AppDatabase.kt` a versión 2).
-  * Diálogo `FontSelectionDialog` adaptado con selector de alcance dual: "Toda la nota" (actualiza la tipografía base de la nota activa) y "Texto seleccionado" (envuelve o inserta la etiqueta `[font:id]...[/font]` en la posición del cursor).
-  * Renderizador `MarkdownRenderer.kt` enriquecido con soporte para etiquetas `[font:id]...[/font]`, permitiendo combinar múltiples estilos tipográficos (Serif, Sans, Mono, Cursiva, Predeterminada) en una misma nota en vista previa interactiva.
-  * Agregado botón "Aa Fuente" en `MarkdownToolbar.kt` para acceso directo y ergonómico desde pantallas móviles.
-  * Tarjetas de notas en `NotesListScreen.kt` renderizan su título y extracto con la tipografía asignada individualmente a cada nota.
-- Mantenidas las correcciones previas de rendimiento y estabilidad:
-  * Corregido el targetState en `AnimatedContent` de `MainActivity.kt`: conmuta según `(activeNote != null)` para prevenir el desmontaje de la pantalla, transiciones innecesarias y el cierre forzado del teclado virtual (IME).
-  * Desacoplado el scroll forzado en `onValueChange` en `NoteEditorScreen.kt` y sincronizado al ViewModel únicamente cuando el texto cambia de manera efectiva.
-  * Optimizada la lista de notas (`NotesListScreen.kt`) memorizando la partición de notas fijadas y métricas por tarjeta.
-  * Integración de Rust nativo (`lib.rs`, `native-bridge.cpp`, `NativeEngine.kt`) para cálculo en una sola pasada de resúmenes de Markdown (`rust_process_note_summary`) y búsqueda insensible a mayúsculas (`rust_match_note`).
-
-
+- Eliminado el botón y diálogo de selección de tipografía de la pantalla principal (NotesListScreen): el menú ya no es accesible desde el selector de notas general y queda restringido exclusivamente al interior del editor de notas.
+- Implementado sistema de tipografía granular y fragmentaria en lugar de ajuste global:
+  * Alcance "Toda la nota": permite definir la tipografía base de la nota activa (almacenada individualmente en Room y reflejada en sus tarjetas).
+  * Alcance "Texto seleccionado": permite envolver fragmentos de texto con etiquetas de formato `[font:id]...[/font]` o insertarlas en la posición del cursor para combinar múltiples familias tipográficas dentro de una misma nota.
+  * Agregado botón de acceso rápido "Aa Fuente" en la barra de herramientas móvil de Markdown (MarkdownToolbar).
+  * Renderizador interactivo en tiempo real (MarkdownPreview) con soporte para familias de fuentes de Android (Predeterminada, Sans-Serif, Serif, Monoespaciada y Cursiva).
+- Actualizada la base de datos Room a versión 2 (MIGRATION_1_2) para persistir el campo `fontTheme` en cada nota sin alterar la configuración del sistema.
+- Incorporada opción para eliminar notas de forma segura con diálogo de confirmación:
+  * Acción de eliminación disponible tanto desde el interior del editor de notas (NoteEditorScreen) como directamente desde cada tarjeta en la lista principal (NotesListScreen) mediante botón dedicado y pulsación prolongada (long-click).
+  * Diálogo modal de confirmación con icono de advertencia, indicación explícita del título de la nota a eliminar y confirmación destructiva para evitar borrados accidentales en pantallas táctiles móviles.
+- Integrada suite completa de diagnóstico, telemetría y depuración en vivo en el dispositivo móvil:
+  * Incorporada dependencia oficial de LeakCanary (v2.14) en Gradle para la detección automática y reporte en tiempo real de fugas de memoria (Memory Leaks).
+  * Creado monitor de rendimiento en segundo plano (PerformanceMonitor) que calcula FPS continuos mediante Choreographer, monitorea la memoria JVM usada vs. máxima, mide el tamaño asignado en el Heap Nativo de C++/Rust y audita los hilos activos del proceso.
+  * Creado colector de registros en tiempo real (InAppLogCollector) que captura la salida de Logcat del proceso para inspección sin cables ni PC.
+  * Diseñado e integrado widget flotante interactivo (PerformanceFloatingHud) arrastrable sobre toda la interfaz con métricas en vivo (FPS, RAM JVM/Nativa e hilos) y selector de visibilidad.
+  * Diseñado panel de control completo (DebugDashboardDialog) con 4 pestañas interactivas: métricas de rendimiento con disparador de Garbage Collector (GC), explorador de hilos activos con estados y prioridades, visor de logs en tiempo real con filtros por severidad y búsqueda, e información de hardware, arquitecturas ABI y estado de enlace con los motores de C++, Lua y Rust.
+  * Agregado botón de acceso directo al panel de depuración en la barra superior de la pantalla principal (NotesListScreen).

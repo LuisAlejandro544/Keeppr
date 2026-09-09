@@ -49,6 +49,7 @@ gradle :app:testDebugUnitTest
    - Almacenamiento fuera de línea garantizado sin depender de servicios en la nube privativos.
    - Búsqueda en tiempo real por texto, etiquetas y categorías.
    - Fijado de notas prioritarias y conteo automático de palabras y caracteres.
+   - Eliminación segura de notas con diálogo modal de confirmación, accesible tanto desde la tarjeta en la lista principal como desde la barra superior del editor.
    - Guardado individual de la tipografía base por nota (`fontTheme`) con migración automática de base de datos a versión 2.
 
 2. **Núcleo de Cómputo y Aceleración en Rust:**
@@ -75,6 +76,15 @@ gradle :app:testDebugUnitTest
 
 6. **Distribución Autónoma:**
    - Preparado para tiendas de aplicaciones de terceros (Uptodown, F-Droid, APK directo) cumpliendo con políticas de privacidad e integridad del sistema.
+
+7. **Suite de Diagnóstico y Depuración en Vivo (In-App Debug Suite):**
+   - **LeakCanary (v2.14):** Detección automática y en tiempo real de fugas de memoria (Memory Leaks) en vistas, actividades y componentes en ejecución sin necesidad de PC.
+   - **HUD / Overlay Flotante de Rendimiento:** Indicador superpuesto y arrastrable que muestra FPS en vivo (vía `Choreographer`), memoria JVM usada y máxima, memoria del Heap Nativo (C++/Rust) y número de hilos concurrentes.
+   - **Dashboard / Panel de Control de Depuración:**
+     * *Rendimiento:* Métricas en tiempo real de FPS, consumo de memoria JVM vs. Heap Nativo, disparador manual de recolección de basura (GC) y estado de batería.
+     * *Hilos Activos:* Inspección en tiempo real de cada hilo en ejecución (nombre, estado, prioridad y grupo).
+     * *Visor de Logs del Proceso:* Lector integrado de Logcat con filtrado por nivel de severidad (Verbose a Error) y búsqueda de texto en vivo.
+     * *Diagnóstico del Sistema & Nativos:* Inspección de hardware, ABI activa (`arm64-v8a`, `armeabi-v7a`, `x86_64`) y estado de los núcleos C++, Lua 5.4.6 y Rust.
 
 ---
 

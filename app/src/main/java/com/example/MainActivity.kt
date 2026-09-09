@@ -9,17 +9,27 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.local.AppDatabase
 import com.example.data.repository.NoteRepository
+import com.example.debug.InAppLogCollector
+import com.example.debug.PerformanceMonitor
+import com.example.ui.debug.DebugDashboardDialog
+import com.example.ui.debug.PerformanceFloatingHud
 import com.example.ui.screens.NoteEditorScreen
 import com.example.ui.screens.NotesListScreen
 import com.example.ui.theme.MyApplicationTheme
@@ -54,6 +64,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun VaultNotesApp(viewModel: NotesViewModel) {
+  val scope = rememberCoroutineScope()
   val notes by viewModel.filteredNotes.collectAsStateWithLifecycle()
   val tags by viewModel.allTags.collectAsStateWithLifecycle()
   val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
@@ -61,47 +72,77 @@ fun VaultNotesApp(viewModel: NotesViewModel) {
   val activeNote by viewModel.activeNote.collectAsStateWithLifecycle()
   val editorMode by viewModel.editorMode.collectAsStateWithLifecycle()
   val isCompactView by viewModel.isCompactView.collectAsStateWithLifecycle()
-  val selectedFont by viewModel.selectedFont.collectAsStateWithLifecycle()
 
-  // Navigate smoothly between Note List and Note Editor without recreating the editor on every keystroke
-  AnimatedContent(
-    targetState = (activeNote != null),
-    transitionSpec = { fadeIn() togetherWith fadeOut() },
-    label = "ScreenTransition"
-  ) { isEditing ->
-    if (isEditing) {
-      val currentActiveNote = activeNote
-      if (currentActiveNote != null) {
-        NoteEditorScreen(
-          note = currentActiveNote,
-          editorMode = editorMode,
-          onTitleChange = viewModel::updateActiveNoteTitle,
-          onContentChange = viewModel::updateActiveNoteContent,
-          onIconChange = viewModel::updateActiveNoteIcon,
-          onTagsChange = viewModel::updateActiveNoteTags,
-          onTogglePin = viewModel::toggleActiveNotePin,
-          onToggleTask = viewModel::toggleTaskAtLine,
-          onModeChange = viewModel::setEditorMode,
-          onNoteFontChange = viewModel::updateActiveNoteFontTheme,
-          onDeleteNote = viewModel::deleteActiveNote,
-          onBackClick = viewModel::closeActiveNote
+  // Iniciar monitores de depuración in-app para variante debug
+  LaunchedEffect(Unit) {
+    PerformanceMonitor.startMonitoring(scope)
+    InAppLogCollector.startCollecting(scope)
+  }
+
+  val metrics by PerformanceMonitor.metrics.collectAsStateWithLifecycle()
+  val isHudVisible by PerformanceMonitor.isOverlayVisible.collectAsStateWithLifecycle()
+  val logs by InAppLogCollector.logs.collectAsStateWithLifecycle()
+  var showDebugDashboard by remember { mutableStateOf(false) }
+
+  Box(modifier = Modifier.fillMaxSize()) {
+    // Navigate smoothly between Note List and Note Editor without recreating the editor on every keystroke
+    AnimatedContent(
+      targetState = (activeNote != null),
+      transitionSpec = { fadeIn() togetherWith fadeOut() },
+      label = "ScreenTransition"
+    ) { isEditing ->
+      if (isEditing) {
+        val currentActiveNote = activeNote
+        if (currentActiveNote != null) {
+          NoteEditorScreen(
+            note = currentActiveNote,
+            editorMode = editorMode,
+            onTitleChange = viewModel::updateActiveNoteTitle,
+            onContentChange = viewModel::updateActiveNoteContent,
+            onIconChange = viewModel::updateActiveNoteIcon,
+            onTagsChange = viewModel::updateActiveNoteTags,
+            onTogglePin = viewModel::toggleActiveNotePin,
+            onToggleTask = viewModel::toggleTaskAtLine,
+            onModeChange = viewModel::setEditorMode,
+            onNoteFontChange = viewModel::updateActiveNoteFontTheme,
+            onDeleteNote = viewModel::deleteActiveNote,
+            onBackClick = viewModel::closeActiveNote
+          )
+        }
+      } else {
+        NotesListScreen(
+          notes = notes,
+          tags = tags,
+          searchQuery = searchQuery,
+          selectedTag = selectedTag,
+          isCompactView = isCompactView,
+          onSearchQueryChange = viewModel::onSearchQueryChange,
+          onTagSelect = viewModel::onTagSelect,
+          onToggleViewMode = viewModel::toggleViewMode,
+          onNoteClick = viewModel::openNote,
+          onCreateNoteClick = viewModel::createNewNote,
+          onDeleteNote = viewModel::deleteNote,
+          onOpenDebugDashboard = { showDebugDashboard = true }
         )
       }
-    } else {
-      NotesListScreen(
-        notes = notes,
-        tags = tags,
-        searchQuery = searchQuery,
-        selectedTag = selectedTag,
-        isCompactView = isCompactView,
-        selectedFont = selectedFont,
-        onSearchQueryChange = viewModel::onSearchQueryChange,
-        onTagSelect = viewModel::onTagSelect,
-        onToggleViewMode = viewModel::toggleViewMode,
-        onNoteClick = viewModel::openNote,
-        onCreateNoteClick = viewModel::createNewNote,
-        onDeleteNote = viewModel::deleteNote,
-        onFontSelected = viewModel::setFontTheme
+    }
+
+    // HUD flotante de rendimiento en pantalla (FPS, RAM JVM y RAM Nativa de Rust/C++, Hilos)
+    if (isHudVisible) {
+      PerformanceFloatingHud(
+        metrics = metrics,
+        onOpenFullDashboard = { showDebugDashboard = true },
+        onClose = { PerformanceMonitor.setOverlayVisible(false) }
+      )
+    }
+
+    // Diálogo con panel completo de depuración (Rendimiento, Hilos, Logs en vivo e Hyperion/Sistema)
+    if (showDebugDashboard) {
+      DebugDashboardDialog(
+        metrics = metrics,
+        logs = logs,
+        onClose = { showDebugDashboard = false },
+        onClearLogs = { InAppLogCollector.clear() }
       )
     }
   }

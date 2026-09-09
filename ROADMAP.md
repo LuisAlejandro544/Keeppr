@@ -18,9 +18,14 @@ Plan de evolución técnica y funcional para la aplicación VaultNotes.
   - Algoritmo de coincidencia y filtrado instantáneo en Rust (`rust_match_note`) coordinado con corrutinas de Kotlin en `Dispatchers.Default`.
 - [x] Diálogo interactivo en la UI para inspección de motores y ejecución dinámica de scripts Lua.
 - [x] Personalización tipográfica granular con 5 familias nativas del sistema Android (Predeterminada, Sans-Serif, Serif, Monoespaciada, Cursiva) aplicables individualmente por nota o a fragmentos específicos de texto (inline con `[font:id]...[/font]`), con vista previa interactiva y persistencia en Room (migración v2).
+- [x] Eliminación segura de notas con diálogo modal de confirmación en la UI (en tarjetas de lista y editor de notas).
 - [x] Script de mantenimiento automatizado `clean_native_artifacts.sh` para purgar carpetas `target`, `.cxx` y archivos residuales.
 - [x] Automatización CI con GitHub Actions (compilación limpia sin caché de APK Debug y soporte para sobrescritura de commits).
 - [x] Script autónomo `setup_debug_keystore.sh` para generación forzada y limpia del keystore debug sin dependencias externas.
+- [x] Suite integrada de depuración móvil en vivo (In-App Debug & Diagnostics):
+  - Integración de LeakCanary (v2.14) para monitoreo automático de fugas de memoria.
+  - HUD / Overlay flotante arrastrable de rendimiento con métricas en tiempo real (FPS con `Choreographer`, memoria JVM, memoria Heap Nativo C++/Rust, hilos concurrentes).
+  - Dashboard de diagnóstico con 4 pestañas: Rendimiento en vivo, Explorador de Hilos con estado y prioridades, Visor de Logs (Logcat) con filtros por nivel, e Inspección del Sistema & Motores Nativos.
 
 ---
 

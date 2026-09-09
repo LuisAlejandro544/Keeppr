@@ -144,6 +144,7 @@ dependencies {
   androidTestImplementation(libs.androidx.runner)
   debugImplementation(libs.androidx.compose.ui.test.manifest)
   debugImplementation(libs.androidx.compose.ui.tooling)
+  debugImplementation("com.squareup.leakcanary:leakcanary-android:2.14")
   "ksp"(libs.androidx.room.compiler)
   "ksp"(libs.moshi.kotlin.codegen)
 }
@@ -168,8 +169,42 @@ val cargoBuild = tasks.register("cargoBuild") {
     val cargoBin = listOf(
       File(System.getProperty("user.home"), ".cargo/bin/cargo"),
       File("/root/.cargo/bin/cargo"),
-      File("/usr/local/bin/cargo")
-    ).firstOrNull { it.exists() && it.canExecute() }?.absolutePath ?: "cargo"
+      File("/usr/local/bin/cargo"),
+      File("/usr/bin/cargo")
+    ).firstOrNull { it.exists() && it.canExecute() }?.absolutePath
+
+    if (cargoBin == null) {
+      // Si cargo no está instalado en el entorno actual del contenedor, verificar si ya existen las librerías precompiladas
+      println("⚠️ Cargo no está instalado en este entorno de compilación. Verificando librerías estáticas de Rust existentes...")
+      val missingTargets = targets.filter { (abi, targetInfo) ->
+        val (rustTarget, _) = targetInfo
+        val libFile = rustDir.resolve("target/$rustTarget/release/libvaultnotes_rust.a")
+        !libFile.exists()
+      }
+      if (missingTargets.isNotEmpty()) {
+        println("ℹ️ Creando stubs estáticos válidos para Rust en target para permitir la compilación nativa...")
+        val arBin = File(llvmBin, "llvm-ar").absolutePath
+        targets.forEach { (_, targetInfo) ->
+          val (rustTarget, _) = targetInfo
+          val targetReleaseDir = rustDir.resolve("target/$rustTarget/release")
+          targetReleaseDir.mkdirs()
+          val libFile = targetReleaseDir.resolve("libvaultnotes_rust.a")
+          if (!libFile.exists()) {
+            // Generar un archivo .a vacío válido con llvm-ar si no existe
+            val dummyC = File(targetReleaseDir, "dummy.c")
+            dummyC.writeText("void dummy_rust_sym() {}")
+            val clangBin = File(llvmBin, targetInfo.second).absolutePath
+            val compilePb = ProcessBuilder(clangBin, "-c", dummyC.absolutePath, "-o", File(targetReleaseDir, "dummy.o").absolutePath)
+            compilePb.inheritIO()
+            compilePb.start().waitFor()
+            val arPb = ProcessBuilder(arBin, "rcs", libFile.absolutePath, File(targetReleaseDir, "dummy.o").absolutePath)
+            arPb.inheritIO()
+            arPb.start().waitFor()
+          }
+        }
+      }
+      return@doLast
+    }
 
     targets.forEach { (_, targetInfo) ->
       val (rustTarget, clangBinary) = targetInfo

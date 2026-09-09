@@ -29,6 +29,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.GridView
@@ -75,9 +76,7 @@ import androidx.compose.foundation.verticalScroll
 import com.example.R
 import com.example.data.model.Note
 import androidx.compose.material.icons.filled.Memory
-import androidx.compose.material.icons.filled.FormatSize
 import com.example.native.NativeEngine
-import com.example.ui.components.FontSelectionDialog
 import com.example.ui.theme.AppFontTheme
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -91,19 +90,17 @@ fun NotesListScreen(
     searchQuery: String,
     selectedTag: String?,
     isCompactView: Boolean,
-    selectedFont: AppFontTheme = AppFontTheme.DEFAULT,
     onSearchQueryChange: (String) -> Unit,
     onTagSelect: (String?) -> Unit,
     onToggleViewMode: () -> Unit,
     onNoteClick: (Note) -> Unit,
     onCreateNoteClick: () -> Unit,
     onDeleteNote: (Note) -> Unit,
-    onFontSelected: (AppFontTheme) -> Unit = {},
+    onOpenDebugDashboard: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var noteToDelete by remember { mutableStateOf<Note?>(null) }
     var showNativeEngineDialog by remember { mutableStateOf(false) }
-    var showFontDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -124,13 +121,13 @@ fun NotesListScreen(
                 },
                 actions = {
                     IconButton(
-                        onClick = { showFontDialog = true },
-                        modifier = Modifier.testTag("list_select_font_button")
+                        onClick = onOpenDebugDashboard,
+                        modifier = Modifier.testTag("debug_dashboard_button")
                     ) {
                         Icon(
-                            imageVector = Icons.Default.FormatSize,
-                            contentDescription = stringResource(R.string.select_typography),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            imageVector = Icons.Default.BugReport,
+                            contentDescription = "Panel de Debug",
+                            tint = MaterialTheme.colorScheme.primary
                         )
                     }
 
@@ -294,7 +291,8 @@ fun NotesListScreen(
                                 note = note,
                                 isCompact = isCompactView,
                                 onClick = { onNoteClick(note) },
-                                onLongClick = { noteToDelete = note }
+                                onLongClick = { noteToDelete = note },
+                                onDeleteClick = { noteToDelete = note }
                             )
                         }
                     }
@@ -310,7 +308,8 @@ fun NotesListScreen(
                                 note = note,
                                 isCompact = isCompactView,
                                 onClick = { onNoteClick(note) },
-                                onLongClick = { noteToDelete = note }
+                                onLongClick = { noteToDelete = note },
+                                onDeleteClick = { noteToDelete = note }
                             )
                         }
                     }
@@ -323,11 +322,28 @@ fun NotesListScreen(
     noteToDelete?.let { note ->
         AlertDialog(
             onDismissRequest = { noteToDelete = null },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(28.dp)
+                )
+            },
             title = { Text(stringResource(R.string.delete_confirm_title)) },
             text = {
-                Text(
-                    text = "Se eliminará permanentemente \"${note.title.ifBlank { "Nota sin título" }}\"."
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = "Se eliminará permanentemente \"${note.title.ifBlank { "Nota sin título" }}\".",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = stringResource(R.string.delete_confirm_message),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             },
             confirmButton = {
                 TextButton(
@@ -454,21 +470,6 @@ fun NotesListScreen(
             }
         )
     }
-
-    // Diálogo interactivo para elegir entre las 5 tipografías de VaultNotes
-    if (showFontDialog) {
-        FontSelectionDialog(
-            currentFont = selectedFont,
-            hasSelection = false,
-            onApplyToWholeNote = { newFont ->
-                onFontSelected(newFont)
-            },
-            onApplyToSelection = { newFont ->
-                onFontSelected(newFont)
-            },
-            onDismissRequest = { showFontDialog = false }
-        )
-    }
 }
 
 @Composable
@@ -509,7 +510,8 @@ private fun NoteCard(
     note: Note,
     isCompact: Boolean,
     onClick: () -> Unit,
-    onLongClick: () -> Unit
+    onLongClick: () -> Unit,
+    onDeleteClick: () -> Unit
 ) {
     val formattedDate = remember(note.updatedAt) {
         val sdf = SimpleDateFormat("d MMM, HH:mm", Locale.getDefault())
@@ -572,7 +574,23 @@ private fun NoteCard(
                         imageVector = Icons.Default.PushPin,
                         contentDescription = "Fijada",
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier
+                            .padding(end = 4.dp)
+                            .size(16.dp)
+                    )
+                }
+
+                IconButton(
+                    onClick = onDeleteClick,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .testTag("card_delete_button_${note.id}")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = stringResource(R.string.delete_note),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             }

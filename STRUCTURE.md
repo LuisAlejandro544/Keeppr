@@ -38,19 +38,25 @@ Este documento detalla el árbol de directorios, la organización de módulos y 
 │       │   │   │       └── NoteRepository.kt # Abstracción del acceso a datos
 │       │   │   ├── native/
 │       │   │   │   └── NativeEngine.kt    # Fachada Kotlin para invocar métodos JNI (Rust, C++, Lua)
+│       │   │   ├── debug/                 # Módulo de Monitoreo y Diagnóstico en Vivo
+│       │   │   │   ├── PerformanceMonitor.kt # Monitor en tiempo real de FPS (Choreographer), RAM (JVM y Heap Nativo) e hilos
+│       │   │   │   └── InAppLogCollector.kt  # Colector en tiempo real de logs del proceso (Logcat) con filtros
 │       │   │   ├── ui/                    # Capa de Presentación (Jetpack Compose)
 │       │   │   │   ├── components/
 │       │   │   │   │   ├── EmojiPickerDialog.kt    # Selector de iconos/emojis para notas
 │       │   │   │   │   ├── MarkdownToolbar.kt      # Barra de herramientas Markdown móvil (con botón 'Aa Fuente')
 │       │   │   │   │   └── FontSelectionDialog.kt  # Selector de tipografías con alcance dual (toda la nota vs selección)
+│       │   │   │   ├── debug/                 # Componentes Visuales de Depuración y Rendimiento
+│       │   │   │   │   ├── PerformanceFloatingHud.kt # HUD / Overlay flotante arrastrable sobre toda la app
+│       │   │   │   │   └── DebugDashboardDialog.kt   # Diálogo / Dashboard completo con pestañas de Rendimiento, Hilos, Logs y Sistema
 │       │   │   │   ├── markdown/
 │       │   │   │   │   ├── MarkdownParser.kt       # Parser offline de bloques y checkboxes estilo Notion
 │       │   │   │   │   └── MarkdownPreview.kt      # Renderizado interactivo con fuentes base y etiquetas [font:id]
 │       │   │   │   ├── navigation/
 │       │   │   │   │   └── AppNavigation.kt # Grafo de navegación y rutas de pantalla
 │       │   │   │   ├── screens/
-│       │   │   │   │   ├── NotesListScreen.kt  # Pantalla principal: lista (tarjetas con fuente por nota), búsqueda y motor
-│       │   │   │   │   └── NoteEditorScreen.kt # Editor con soporte de tipografía por nota y etiquetas de fragmento
+│       │   │   │   │   ├── NotesListScreen.kt  # Pantalla principal: lista (tarjetas con fuente y eliminación con confirmación), búsqueda y motor
+│       │   │   │   │   └── NoteEditorScreen.kt # Editor con soporte de tipografía por nota, etiquetas de fragmento y eliminación con confirmación
 │       │   │   │   ├── theme/
 │       │   │   │   │   ├── Color.kt, Theme.kt, Type.kt # Paleta M3 y definiciones de AppFontTheme (5 familias de fuentes)
 │       │   │   │   └── viewmodel/
@@ -93,6 +99,13 @@ Este documento detalla el árbol de directorios, la organización de módulos y 
 - **Jetpack Compose + Material 3**: UI declarativa, soporte para modo oscuro/claro, animaciones fluidas y accesibilidad táctil con áreas mínimas de 48dp.
 - **Sistema Tipográfico Granular**: 5 familias de fuentes nativas seleccionables de forma individual por nota o por fragmento de texto (`[font:id]...[/font]`) sin alterar la aplicación globalmente, con persistencia en base de datos Room.
 - **`NotesViewModel`**: Maneja el estado de la UI (`StateFlow`) desacoplado del ciclo de vida de la actividad.
+
+### 4. Capa de Diagnóstico y Depuración en Tiempo Real (`app/src/main/java/com/example/debug` y `ui/debug`)
+- **`PerformanceMonitor`**: Muestrea FPS mediante `Choreographer`, calcula memoria JVM libre/usada y rastrea el uso de memoria nativa C++/Rust mediante `Debug.getNativeHeapAllocatedSize()`.
+- **`InAppLogCollector`**: Captura en tiempo real la salida de Logcat del proceso para auditar eventos sin conectar el teléfono a un PC.
+- **`PerformanceFloatingHud`**: Overlay arrastrable con respuesta háptica para visualización continua de FPS, memoria e hilos sobre cualquier vista de la app.
+- **`DebugDashboardDialog`**: Panel modal con 4 pestañas interactivas: métricas de rendimiento y GC manual, visor e inspector de hilos activos, consola de logs en vivo y estado del hardware y enlaces nativos (C++, Lua, Rust).
+- **LeakCanary (v2.14)**: Detección automatizada de fugas de memoria configurada en Gradle sin intervención manual.
 
 ---
 
