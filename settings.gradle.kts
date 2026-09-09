@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "VaultNotes"
+rootProject.name = "Keeppr"
 
 include(":app")

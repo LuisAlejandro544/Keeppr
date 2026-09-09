@@ -9,7 +9,7 @@ set -e
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$PROJECT_ROOT"
 
-echo "🧹 [VaultNotes] Iniciando limpieza de artefactos nativos (C++, Rust, Lua)..."
+echo "🧹 [Keeppr] Iniciando limpieza de artefactos nativos (C++, Rust, Lua)..."
 
 # 1. Limpieza de artefactos de compilación de Rust (Cargo target)
 RUST_TARGET_DIR="app/src/main/rust/target"

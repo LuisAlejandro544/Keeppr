@@ -1,6 +1,10 @@
-# VaultNotes (Motor Nativo Híbrido: Kotlin + C++ + Rust + Lua)
+# Keeppr (Motor Nativo Híbrido: Kotlin + C++ + Rust + Lua)
 
 Aplicación móvil de gestión segura de notas y apuntes de alto rendimiento, diseñada con persistencia local robusta en Room, interfaz moderna en Jetpack Compose y un motor nativo multinúcleo en C++, Rust y Lua (C puro) compilado para distribución directa en formato APK (Uptodown y tiendas independientes).
+
+- **Nombre Oficial:** Keeppr
+- **Identificador de Paquete (Application ID):** `com.keeppr.notes` (almacenamiento en `Android/data/com.keeppr.notes`)
+- **Identidad Visual / Icono:** Cuaderno de tapa dura personal con banda elástica vertical (estilo Moleskine) en formato WebP de máxima calidad y alta compresión (`ic_keeppr_logo.webp`), integrado como icono adaptativo Android sobre paleta oscura y acentos cálidos.
 
 ---
 
@@ -36,7 +40,17 @@ chmod +x clean_native_artifacts.sh
 ./clean_native_artifacts.sh
 ```
 
-### 4. Ejecución de Pruebas Unitarias
+### 4. Conversor de Imágenes a WebP (Máxima Compresión y Calidad)
+Script utilitario para convertir recursos gráficos y logos de formato JPG a WebP sin pérdida perceptible de calidad:
+```bash
+chmod +x convert_jpg_to_webp.sh
+# Conversión predeterminada del logo de la app:
+./convert_jpg_to_webp.sh
+# Conversión de cualquier imagen personalizada:
+./convert_jpg_to_webp.sh ruta/imagen.jpg [ruta_salida.webp] [max_quality|lossless]
+```
+
+### 5. Ejecución de Pruebas Unitarias
 ```bash
 gradle :app:testDebugUnitTest
 ```
@@ -47,25 +61,33 @@ gradle :app:testDebugUnitTest
 
 1. **Persistencia Local con Room (SQLite Seguro):**
    - Almacenamiento fuera de línea garantizado sin depender de servicios en la nube privativos.
-   - Búsqueda en tiempo real por texto, etiquetas y categorías.
+   - Búsqueda en tiempo real por texto, etiquetas y categorías (con protección y exclusión de contenido cifrado).
    - Fijado de notas prioritarias y conteo automático de palabras y caracteres.
    - Eliminación segura de notas con diálogo modal de confirmación, accesible tanto desde la tarjeta en la lista principal como desde la barra superior del editor.
-   - Guardado individual de la tipografía base por nota (`fontTheme`) con migración automática de base de datos a versión 2.
+   - Guardado individual de la tipografía base por nota (`fontTheme`) y estado de protección (`isEncrypted`) con migración automática de base de datos a versión 3 (`MIGRATION_2_3`).
 
-2. **Núcleo de Cómputo y Aceleración en Rust:**
+2. **Cifrado Criptográfico Nativo con Contraseña (AES-256 + PBKDF2 en Rust/C++):**
+   - **Cifrado de grado militar offline:** Cifrado simétrico AES-256-CBC con padding PKCS#7 y generación de vector de inicialización (IV) de 16 bytes directamente en el motor nativo de Rust y C++.
+   - **Derivación de clave robusta:** PBKDF2-HMAC-SHA256 con 10,000 iteraciones y sal aleatoria de 16 bytes para resistir ataques de fuerza bruta y diccionarios.
+   - **Autenticación de Integridad:** Código de autenticación de mensajes HMAC-SHA256 (32 bytes) verificado en tiempo constante contra ataques de temporización (timing attacks).
+   - **Seguridad en memoria y cero persistencia de claves:** La contraseña nunca se almacena en disco ni en base de datos. Se mantiene en una sesión volátil en memoria (`activeNoteSessionPassword`) mientras la nota está abierta y se purga de inmediato al cerrarla.
+   - **Privacidad en la interfaz:** Las notas cifradas muestran un distintivo de candado y un extracto protegido en la lista principal. Para abrirlas se requiere desbloqueo mediante contraseña. Además, el contenido cifrado queda excluido de la búsqueda general para prevenir fugas de información sensible.
+   - **Gestión flexible:** El usuario puede proteger cualquier nota con contraseña, confirmar la clave antes de guardar y desprotegerla en cualquier momento si lo desea.
+
+3. **Núcleo de Cómputo y Aceleración en Rust:**
    - Criptografía, operaciones de hashing y procesamiento de texto en bajo nivel compiladas como librería estática nativa (`libvaultnotes_rust.a`).
    - Aceleración nativa de carga y renderizado de notas: extracción de extractos limpios de Markdown (`snippet`), cálculo de métricas y tiempo de lectura en una sola pasada en memoria nativa (`rust_process_note_summary`).
    - Algoritmo de búsqueda rápida insensible a mayúsculas y acentos (`rust_match_note`) ejecutado en memoria nativa y coordinado con corrutinas reactivas en Kotlin (`Dispatchers.Default`).
    - Interfaz C FFI (`extern "C"`) de cero coste de abstracción y compatible con 64 bits (`arm64-v8a`, `x86_64`) y 32 bits (`armeabi-v7a`).
 
-3. **Intérprete C Oficial de Lua 5.4.6:**
+4. **Intérprete C Oficial de Lua 5.4.6:**
    - Motor oficial de Lua compilado en C11 estático.
    - Permite la ejecución y evaluación dinámica de scripts y expresiones lógicas directamente desde el dispositivo.
 
-4. **Puente JNI en C++17:**
+5. **Puente JNI en C++17:**
    - Enlace bidireccional entre la JVM/ART de Kotlin y las librerías nativas con manejo de excepciones y validación de tipos JNI.
 
-5. **Personalización Tipográfica Granular (Por Nota y por Fragmento Inline):**
+6. **Personalización Tipográfica Granular (Por Nota y por Fragmento Inline):**
    - Selector interactivo accesible en el editor de notas y en la barra de herramientas (`MarkdownToolbar` con botón "Aa Fuente") con previsualización en tiempo real.
    - **Sin imposición global:** La tipografía no altera toda la aplicación de manera global; se aplica a nivel individual por nota o a fragmentos específicos de texto.
    - **Alcance dual:**
@@ -74,7 +96,7 @@ gradle :app:testDebugUnitTest
    - 5 familias tipográficas nativas de Android: *Predeterminada (Sistema)*, *Sans-Serif Moderna*, *Serif Clásica (Editorial)*, *Monoespaciada (Código)* y *Cursiva Manuscrita*.
    - Persistencia 100% offline sin dependencias de red ni servicios externos.
 
-6. **Ajustes de Apariencia y Personalización de Tema:**
+7. **Ajustes de Apariencia y Personalización de Tema:**
    - Diálogo modal de ajustes dedicado (`SettingsDialog`) accesible mediante el botón de paleta en la barra superior.
    - **Modo de Tema:** Selección entre *Seguir el Sistema*, *Modo Claro* forzado y *Modo Oscuro* forzado.
    - **Material You (Color Dinámico):** Extracción nativa de la paleta de colores del fondo de pantalla del sistema en dispositivos Android 12+ (API 31+), con interruptor para activar/desactivar en vivo.
@@ -82,10 +104,10 @@ gradle :app:testDebugUnitTest
    - **Tipografía Global:** Permite configurar la tipografía predeterminada de la interfaz completa junto al sistema granular de fuentes por nota.
    - Persistencia local inmediata mediante `SharedPreferences` reactivas sincronizadas en el `NotesViewModel`.
 
-7. **Distribución Autónoma:**
+8. **Distribución Autónoma:**
    - Preparado para tiendas de aplicaciones de terceros (Uptodown, F-Droid, APK directo) cumpliendo con políticas de privacidad e integridad del sistema.
 
-8. **Suite de Diagnóstico y Depuración en Vivo (In-App Debug Suite):**
+9. **Suite de Diagnóstico y Depuración en Vivo (In-App Debug Suite):**
    - **LeakCanary (v2.14):** Detección automática y en tiempo real de fugas de memoria (Memory Leaks) en vistas, actividades y componentes en ejecución sin necesidad de PC.
    - **HUD / Overlay Flotante de Rendimiento:** Indicador superpuesto y arrastrable que muestra FPS en vivo (vía `Choreographer`), memoria JVM usada y máxima, memoria del Heap Nativo (C++/Rust) y número de hilos concurrentes.
    - **Dashboard / Panel de Control de Depuración:**
@@ -96,7 +118,7 @@ gradle :app:testDebugUnitTest
 
 ---
 
-9. **Importación y Exportación Universal (Markdown y Paquetes Vault con Firma Criptográfica):**
+10. **Importación y Exportación Universal (Markdown y Paquetes Vault con Firma Criptográfica):**
     - **Exportación Dual desde el Editor:**
       * *Markdown (.md):* Archivo de texto plano universal para llevar notas a Obsidian, Notion, Logseq, PC o editores externos sin bloqueos de plataforma.
       * *Paquete Vault (.zip firmado):* Archivo comprimido autónomo que contiene el documento `note.md`, metadatos completos en `vault_meta.json` (título, etiquetas, icono, tipografía individual) y la firma de autenticidad `signature.vault`.
@@ -110,7 +132,7 @@ gradle :app:testDebugUnitTest
 
 ## 👥 Gobernanza y Propuestas de la Comunidad (Filosofía Anti-Bloat)
 
-Para evitar que VaultNotes se convierta en una aplicación sobrecargada con herramientas innecesarias que degraden el rendimiento:
+Para evitar que Keeppr se convierta en una aplicación sobrecargada con herramientas innecesarias que degraden el rendimiento:
 
 - **Evolución guiada por la comunidad:** La hoja de ruta de nuevas funciones se define a partir de propuestas y votaciones de los propios usuarios.
 - **Prevención de *Feature Bloat*:** No se implementan funciones superfluas en el núcleo de la aplicación; solo se integran aquellas características con demanda y utilidad contrastada.

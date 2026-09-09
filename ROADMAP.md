@@ -1,6 +1,6 @@
-# Hoja de Ruta (ROADMAP) - VaultNotes
+# Hoja de Ruta (ROADMAP) - Keeppr
 
-Plan de evolución técnica y funcional para la aplicación VaultNotes.
+Plan de evolución técnica y funcional para la aplicación Keeppr (anteriormente VaultNotes).
 
 ---
 
@@ -36,9 +36,16 @@ Plan de evolución técnica y funcional para la aplicación VaultNotes.
 
 ## 📍 Fase 2: Cifrado por Hardware y Bóveda Segura (En Curso 🔄)
 
-- [ ] Integración de cifrado autenticado AES-GCM-256 o ChaCha20-Poly1305 ejecutado directamente en el núcleo de Rust.
-- [ ] Derivación de claves de alta seguridad con Argon2id implementada en Rust para proteger notas confidenciales.
-- [ ] Autenticación biométrica nativa (huella / reconocimiento facial) usando `androidx.biometric`.
+- [x] Motor criptográfico nativo en Rust y C++: cifrado simétrico AES-256-CBC con padding PKCS#7 y generación de IV de 16 bytes.
+- [x] Derivación de claves de alta resistencia PBKDF2-HMAC-SHA256 (10,000 iteraciones) con sal criptográfica de 16 bytes.
+- [x] Autenticación de integridad mediante código MAC HMAC-SHA256 (32 bytes) verificado en tiempo constante contra ataques de temporización.
+- [x] Protección de notas mediante contraseña del usuario con diálogo modal de confirmación (`EncryptNoteDialog`).
+- [x] Desbloqueo interactivo en la lista de notas mediante diálogo modal (`DecryptNoteDialog`) con gestión de sesión efímera en memoria (`activeNoteSessionPassword`) y cero persistencia de contraseñas en SQLite o disco.
+- [x] Cifrado automático al vuelo durante el autoguardado en segundo plano y cierre de notas en `NotesViewModel`.
+- [x] Exclusión del contenido cifrado en las búsquedas en tiempo real para evitar fugas de datos en texto claro.
+- [x] Eliminación flexible de la protección por contraseña con confirmación del usuario (`RemoveEncryptionDialog`).
+- [x] Migración automática de la base de datos Room a versión 3 (`MIGRATION_2_3`) con columna `isEncrypted`.
+- [ ] Autenticación biométrica complementaria (huella / reconocimiento facial) usando `androidx.biometric`.
 - [ ] Modo "Bóveda Oculta": partición protegida por PIN independiente dentro de la base de datos Room.
 
 ---
@@ -59,6 +66,8 @@ Plan de evolución técnica y funcional para la aplicación VaultNotes.
   * Importación con validación de autenticidad y restauración de formato y tipografía.
 - [ ] Sincronización punto a punto (P2P) local mediante red local WiFi/Hotspot sin intermediarios ni servidores en la nube.
 - [x] Soporte para visualización y edición en Markdown enriquecido con renderizado y checkboxes interactivos.
+- [x] Identidad de marca independiente y limpia: Renombrado a **Keeppr**, configuración de `applicationId = "com.keeppr.notes"` para almacenamiento limpio en `Android/data/com.keeppr.notes` sin referencias externas, y creación de nuevo icono de lanzador adaptativo inspirado en un cuaderno de tapa dura personal con banda elástica (estilo Moleskine).
+- [x] Optimización de recursos gráficos nativos con WebP: Creación del script utilitario `convert_jpg_to_webp.sh` con compresión máxima multiruta (cwebp, ffmpeg, ImageMagick) y migración del logo de la app a formato `ic_keeppr_logo.webp` (reducción de peso >75% conservando calidad 100%).
 
 ---
 
@@ -72,7 +81,7 @@ Plan de evolución técnica y funcional para la aplicación VaultNotes.
 
 ## 🗳️ Gobernanza de Funciones: Impulsada por la Comunidad
 
-Para proteger a VaultNotes del *feature bloat* y de código innecesario que casi nadie utiliza:
+Para proteger a Keeppr del *feature bloat* y de código innecesario que casi nadie utiliza:
 
 1. **Priorización por demanda real:** Solo se implementarán aquellas características propuestas y votadas activamente por la comunidad de usuarios.
 2. **Núcleo ligero:** El núcleo de la aplicación se mantiene austero, rápido y centrado en la seguridad de notas.

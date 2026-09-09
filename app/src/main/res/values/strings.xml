@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">VaultNotes</string>
+    <string name="app_name">Keeppr</string>
     <string name="notes_title">Mis Notas</string>
     <string name="search_notes_placeholder">Buscar notas o #etiquetas…</string>
     <string name="no_notes_found">No se encontraron notas</string>
@@ -37,11 +37,34 @@
     <string name="export_note">Exportar nota</string>
     <string name="export_as_markdown">Exportar como Markdown (.md)</string>
     <string name="export_as_markdown_desc">Texto estándar compatible con Obsidian, PC y editores externos</string>
-    <string name="export_as_vault_zip">Exportar Paquete Vault (.zip)</string>
+    <string name="export_as_vault_zip">Exportar Paquete Keeppr (.zip)</string>
     <string name="export_as_vault_zip_desc">Paquete completo firmado con SHA-256 en Rust (preserva tipografía y metadatos)</string>
     <string name="import_note">Importar nota</string>
-    <string name="import_note_desc">Selecciona un archivo .md, .txt o paquete .zip firmado de VaultNotes</string>
+    <string name="import_note_desc">Selecciona un archivo .md, .txt o paquete .zip firmado de Keeppr</string>
     <string name="export_success">Nota exportada correctamente</string>
     <string name="export_error">Error al exportar la nota</string>
     <string name="close">Cerrar</string>
+    <string name="encrypt_note_title">Proteger nota con contraseña</string>
+    <string name="encrypt_note_desc">La nota se cifrará con AES-256 en el motor nativo de Rust. Para volver a verla o editarla deberás ingresar esta contraseña.</string>
+    <string name="password_label">Contraseña</string>
+    <string name="confirm_password_label">Confirmar contraseña</string>
+    <string name="password_error_short">La contraseña debe tener al menos 4 caracteres</string>
+    <string name="password_error_mismatch">Las contraseñas no coinciden</string>
+    <string name="encrypt_button">Cifrar y Proteger</string>
+    <string name="decrypt_note_title">Nota protegida</string>
+    <string name="decrypt_note_desc">Ingresa tu contraseña para desbloquear y editar el contenido.</string>
+    <string name="decrypt_button">Desbloquear</string>
+    <string name="decrypt_error">Contraseña incorrecta o datos dañados</string>
+    <string name="encrypted_badge">Nota protegida con contraseña</string>
+    <string name="remove_encryption_title">¿Quitar protección?</string>
+    <string name="remove_encryption_desc">La nota se guardará en texto claro y no volverá a pedir contraseña para abrirse.</string>
+    <string name="remove_encryption_button">Quitar protección</string>
+    <string name="note_encrypted_success">Nota protegida exitosamente</string>
+    <string name="note_decrypted_success">Nota desbloqueada</string>
+    <string name="note_unprotected_success">Protección eliminada</string>
+    <string name="toast_note_encrypted">Nota protegida con contraseña</string>
+    <string name="toast_encryption_removed">Protección por contraseña eliminada</string>
+    <string name="decrypt_error_wrong_password">Contraseña incorrecta. Inténtalo de nuevo.</string>
+    <string name="encrypted_note_card_snippet">Contenido protegido con contraseña</string>
+    <string name="more_options">Más opciones</string>
 </resources>

@@ -1,6 +1,6 @@
 {
-  "name": "VaultNotes",
-  "description": "Aplicación minimalista y potente de notas combinando Markdown estilo Obsidian y bloques visuales de Notion.",
+  "name": "Keeppr",
+  "description": "Keeppr - Aplicación de notas moderna y potente combinando Markdown estilo Obsidian, bloques visuales y motor de cifrado nativo.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

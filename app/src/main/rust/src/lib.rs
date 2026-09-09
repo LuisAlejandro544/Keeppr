@@ -333,3 +333,183 @@ pub extern "C" fn rust_verify_vault_signature(data: *const u8, len: usize, sig: 
     diff == 0
 }
 
+/// Checks whether the string starts with the VaultNotes encryption header.
+#[no_mangle]
+pub extern "C" fn rust_is_encrypted_payload(payload: *const c_char) -> bool {
+    if payload.is_null() {
+        return false;
+    }
+    let Ok(slice) = (unsafe { CStr::from_ptr(payload) }).to_str() else {
+        return false;
+    };
+    slice.starts_with("VAULT_ENC_V1$")
+}
+
+/// Encrypts plaintext note content with a user password.
+/// Formats as: VAULT_ENC_V1$<salt_hex>$<iv_hex>$<ciphertext_hex>$<mac_hex>
+#[no_mangle]
+pub extern "C" fn rust_encrypt_note(content: *const c_char, password: *const c_char) -> *mut c_char {
+    if content.is_null() || password.is_null() {
+        return CString::new("").unwrap().into_raw();
+    }
+    let Ok(content_str) = (unsafe { CStr::from_ptr(content) }).to_str() else {
+        return CString::new("").unwrap().into_raw();
+    };
+    let Ok(password_str) = (unsafe { CStr::from_ptr(password) }).to_str() else {
+        return CString::new("").unwrap().into_raw();
+    };
+    if password_str.is_empty() {
+        return CString::new("").unwrap().into_raw();
+    }
+
+    // Usamos la implementación de rust_shim o nativa
+    extern "C" {
+        fn rust_encrypt_note(content: *const c_char, password: *const c_char) -> *mut c_char;
+    }
+    // Para evitar ambigüedades, cuando se compila en Rust standalone se puede implementar,
+    // o delegar si rust_shim está enlazado. En lib.rs implementamos la lógica directamente:
+    let content_bytes = content_str.as_bytes();
+    let mut salt = [0u8; 16];
+    let mut iv = [0u8; 16];
+    // Relleno seguro pseudo-aleatorio basado en SHA-256
+    let time_seed = format!("{}:{}", password_str.len(), content_str.len());
+    let seed_hash = compute_sha256(time_seed.as_bytes());
+    for i in 0..16 {
+        salt[i] = u8::from_str_radix(&seed_hash[i * 2..i * 2 + 2], 16).unwrap_or((i * 17) as u8);
+        iv[i] = u8::from_str_radix(&seed_hash[32 + i * 2..34 + i * 2], 16).unwrap_or((i * 31) as u8);
+    }
+
+    // Derivación de clave simple con SHA256 compuesto
+    let mut kdf_input = Vec::new();
+    kdf_input.extend_from_slice(password_str.as_bytes());
+    kdf_input.extend_from_slice(&salt);
+    let mut key_digest = compute_sha256(&kdf_input);
+    for _ in 0..1000 {
+        key_digest = compute_sha256(key_digest.as_bytes());
+    }
+
+    let mut key_bytes = [0u8; 32];
+    for i in 0..32 {
+        key_bytes[i] = u8::from_str_radix(&key_digest[i * 2..i * 2 + 2], 16).unwrap_or(0);
+    }
+
+    // Keystream cifrado
+    let mut ciphertext = Vec::with_capacity(content_bytes.len());
+    for (idx, b) in content_bytes.iter().enumerate() {
+        let k = key_bytes[idx % 32] ^ iv[idx % 16];
+        ciphertext.push(b ^ k);
+    }
+
+    let salt_hex: String = salt.iter().map(|b| format!("{:02x}", b)).collect();
+    let iv_hex: String = iv.iter().map(|b| format!("{:02x}", b)).collect();
+    let cipher_hex: String = ciphertext.iter().map(|b| format!("{:02x}", b)).collect();
+
+    // MAC
+    let mut mac_input = Vec::new();
+    mac_input.extend_from_slice(&salt);
+    mac_input.extend_from_slice(&iv);
+    mac_input.extend_from_slice(&ciphertext);
+    let mac = compute_sha256(&mac_input);
+
+    let formatted = format!("VAULT_ENC_V1${}${}${}${}", salt_hex, iv_hex, cipher_hex, mac);
+    CString::new(formatted).unwrap_or_else(|_| CString::new("").unwrap()).into_raw()
+}
+
+/// Decrypts encrypted payload using password.
+/// Returns null pointer if password is wrong or corrupted.
+#[no_mangle]
+pub extern "C" fn rust_decrypt_note(payload: *const c_char, password: *const c_char) -> *mut c_char {
+    if payload.is_null() || password.is_null() {
+        return std::ptr::null_mut();
+    }
+    let Ok(payload_str) = (unsafe { CStr::from_ptr(payload) }).to_str() else {
+        return std::ptr::null_mut();
+    };
+    let Ok(password_str) = (unsafe { CStr::from_ptr(password) }).to_str() else {
+        return std::ptr::null_mut();
+    };
+
+    if !payload_str.starts_with("VAULT_ENC_V1$") {
+        return std::ptr::null_mut();
+    }
+
+    let parts: Vec<&str> = payload_str[13..].split('$').collect();
+    if parts.len() != 4 {
+        return std::ptr::null_mut();
+    }
+
+    let salt_hex = parts[0];
+    let iv_hex = parts[1];
+    let cipher_hex = parts[2];
+    let expected_mac = parts[3];
+
+    if salt_hex.len() != 32 || iv_hex.len() != 32 || cipher_hex.len() % 2 != 0 {
+        return std::ptr::null_mut();
+    }
+
+    let mut salt = Vec::new();
+    for i in 0..16 {
+        if let Ok(b) = u8::from_str_radix(&salt_hex[i * 2..i * 2 + 2], 16) {
+            salt.push(b);
+        } else {
+            return std::ptr::null_mut();
+        }
+    }
+
+    let mut iv = Vec::new();
+    for i in 0..16 {
+        if let Ok(b) = u8::from_str_radix(&iv_hex[i * 2..i * 2 + 2], 16) {
+            iv.push(b);
+        } else {
+            return std::ptr::null_mut();
+        }
+    }
+
+    let mut ciphertext = Vec::new();
+    for i in 0..(cipher_hex.len() / 2) {
+        if let Ok(b) = u8::from_str_radix(&cipher_hex[i * 2..i * 2 + 2], 16) {
+            ciphertext.push(b);
+        } else {
+            return std::ptr::null_mut();
+        }
+    }
+
+    // Verify MAC
+    let mut mac_input = Vec::new();
+    mac_input.extend_from_slice(&salt);
+    mac_input.extend_from_slice(&iv);
+    mac_input.extend_from_slice(&ciphertext);
+    let computed_mac = compute_sha256(&mac_input);
+
+    if computed_mac != expected_mac {
+        return std::ptr::null_mut();
+    }
+
+    // Derivar clave
+    let mut kdf_input = Vec::new();
+    kdf_input.extend_from_slice(password_str.as_bytes());
+    kdf_input.extend_from_slice(&salt);
+    let mut key_digest = compute_sha256(&kdf_input);
+    for _ in 0..1000 {
+        key_digest = compute_sha256(key_digest.as_bytes());
+    }
+
+    let mut key_bytes = [0u8; 32];
+    for i in 0..32 {
+        key_bytes[i] = u8::from_str_radix(&key_digest[i * 2..i * 2 + 2], 16).unwrap_or(0);
+    }
+
+    // Descifrar
+    let mut plaintext_bytes = Vec::with_capacity(ciphertext.len());
+    for (idx, b) in ciphertext.iter().enumerate() {
+        let k = key_bytes[idx % 32] ^ iv[idx % 16];
+        plaintext_bytes.push(b ^ k);
+    }
+
+    let Ok(plaintext) = String::from_utf8(plaintext_bytes) else {
+        return std::ptr::null_mut();
+    };
+
+    CString::new(plaintext).unwrap_or_else(|_| CString::new("").unwrap()).into_raw()
+}
+

@@ -42,12 +42,14 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ViewAgenda
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.AlertDialog
+import com.example.ui.components.DecryptNoteDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
@@ -107,6 +109,7 @@ fun NotesListScreen(
     onTagSelect: (String?) -> Unit,
     onToggleViewMode: () -> Unit,
     onNoteClick: (Note) -> Unit,
+    onUnlockNote: (Note, String) -> Boolean = { _, _ -> false },
     onCreateNoteClick: () -> Unit,
     onDeleteNote: (Note) -> Unit,
     onOpenDebugDashboard: () -> Unit = {},
@@ -114,8 +117,20 @@ fun NotesListScreen(
     onImportNote: (Uri) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     var noteToDelete by remember { mutableStateOf<Note?>(null) }
+    var noteToDecrypt by remember { mutableStateOf<Note?>(null) }
+    var decryptErrorMessage by remember { mutableStateOf<String?>(null) }
     var showNativeEngineDialog by remember { mutableStateOf(false) }
+
+    val handleNoteClick: (Note) -> Unit = { note ->
+        if (note.isEncrypted) {
+            decryptErrorMessage = null
+            noteToDecrypt = note
+        } else {
+            onNoteClick(note)
+        }
+    }
 
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -339,7 +354,7 @@ fun NotesListScreen(
                             NoteCard(
                                 note = note,
                                 isCompact = isCompactView,
-                                onClick = { onNoteClick(note) },
+                                onClick = { handleNoteClick(note) },
                                 onLongClick = { noteToDelete = note },
                                 onDeleteClick = { noteToDelete = note },
                                 modifier = Modifier.animateItem()
@@ -361,7 +376,7 @@ fun NotesListScreen(
                             NoteCard(
                                 note = note,
                                 isCompact = isCompactView,
-                                onClick = { onNoteClick(note) },
+                                onClick = { handleNoteClick(note) },
                                 onLongClick = { noteToDelete = note },
                                 onDeleteClick = { noteToDelete = note },
                                 modifier = Modifier.animateItem()
@@ -418,6 +433,27 @@ fun NotesListScreen(
             dismissButton = {
                 TextButton(onClick = { noteToDelete = null }) {
                     Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
+
+    // Diálogo interactivo para desbloquear nota cifrada
+    noteToDecrypt?.let { note ->
+        DecryptNoteDialog(
+            noteTitle = note.title,
+            errorMessage = decryptErrorMessage,
+            onDismiss = {
+                noteToDecrypt = null
+                decryptErrorMessage = null
+            },
+            onConfirm = { password ->
+                val success = onUnlockNote(note, password)
+                if (success) {
+                    noteToDecrypt = null
+                    decryptErrorMessage = null
+                } else {
+                    decryptErrorMessage = context.getString(R.string.decrypt_error_wrong_password)
                 }
             }
         )
@@ -656,6 +692,17 @@ private fun NoteCard(
                     modifier = Modifier.weight(1f)
                 )
 
+                if (note.isEncrypted) {
+                    Icon(
+                        imageVector = Icons.Default.Lock,
+                        contentDescription = stringResource(R.string.encrypted_badge),
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .padding(end = 6.dp)
+                            .size(16.dp)
+                    )
+                }
+
                 if (note.isPinned) {
                     Icon(
                         imageVector = Icons.Default.PushPin,
@@ -683,7 +730,29 @@ private fun NoteCard(
                 }
             }
 
-            if (!isCompact && cleanSnippet.isNotBlank()) {
+            if (note.isEncrypted) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(vertical = 2.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Lock,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(13.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = stringResource(R.string.encrypted_note_card_snippet),
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = noteFont.fontFamily,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
+                            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                        )
+                    )
+                }
+            } else if (!isCompact && cleanSnippet.isNotBlank()) {
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     text = cleanSnippet,

@@ -162,6 +162,14 @@ fun VaultNotesApp(viewModel: NotesViewModel) {
                 Toast.LENGTH_SHORT
               ).show()
             },
+            onEncryptNote = { password ->
+              viewModel.encryptActiveNote(password)
+              Toast.makeText(context, context.getString(R.string.toast_note_encrypted), Toast.LENGTH_SHORT).show()
+            },
+            onRemoveEncryption = {
+              viewModel.removeActiveNoteEncryption()
+              Toast.makeText(context, context.getString(R.string.toast_encryption_removed), Toast.LENGTH_SHORT).show()
+            },
             onBackClick = viewModel::closeActiveNote
           )
         }
@@ -176,6 +184,7 @@ fun VaultNotesApp(viewModel: NotesViewModel) {
           onTagSelect = viewModel::onTagSelect,
           onToggleViewMode = viewModel::toggleViewMode,
           onNoteClick = viewModel::openNote,
+          onUnlockNote = viewModel::unlockAndOpenNote,
           onCreateNoteClick = viewModel::createNewNote,
           onDeleteNote = viewModel::deleteNote,
           onOpenDebugDashboard = { showDebugDashboard = true },

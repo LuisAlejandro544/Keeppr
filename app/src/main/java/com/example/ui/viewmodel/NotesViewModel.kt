@@ -98,6 +98,9 @@ class NotesViewModel(
 
     private var saveJob: Job? = null
 
+    // Contraseña en memoria para la sesión activa de la nota abierta
+    private var activeNoteSessionPassword: String? = null
+
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
@@ -136,13 +139,22 @@ class NotesViewModel(
             notes
         } else {
             notes.filter { note ->
-                // Motor nativo de Rust acelerando la búsqueda insensible a mayúsculas
-                val matchesQuery = q.isBlank() || NativeEngine.matchNote(
-                    query = q,
-                    title = note.title,
-                    content = note.content,
-                    tags = note.tags
-                )
+                // Si la nota está cifrada, comparamos solo en título y etiquetas para no comparar con el payload cifrado
+                val matchesQuery = q.isBlank() || if (note.isEncrypted) {
+                    NativeEngine.matchNote(
+                        query = q,
+                        title = note.title,
+                        content = "",
+                        tags = note.tags
+                    )
+                } else {
+                    NativeEngine.matchNote(
+                        query = q,
+                        title = note.title,
+                        content = note.content,
+                        tags = note.tags
+                    )
+                }
 
                 val matchesTag = tag == null || note.tagList.any { it.equals(tag, ignoreCase = true) }
 
@@ -166,8 +178,47 @@ class NotesViewModel(
     }
 
     fun openNote(note: Note, initialMode: EditorMode = EditorMode.EDIT) {
+        activeNoteSessionPassword = null
         _activeNote.value = note
         _editorMode.value = initialMode
+    }
+
+    /**
+     * Intenta desbloquear una nota protegida con la contraseña provista.
+     * Retorna true si la contraseña es correcta y la abre en el editor, o false en caso de error.
+     */
+    fun unlockAndOpenNote(note: Note, password: String): Boolean {
+        val decrypted = NativeEngine.decryptNote(note.content, password)
+        return if (decrypted != null) {
+            activeNoteSessionPassword = password
+            _activeNote.value = note.copy(content = decrypted)
+            _editorMode.value = EditorMode.EDIT
+            true
+        } else {
+            false
+        }
+    }
+
+    /**
+     * Protege y cifra la nota actualmente activa con una nueva contraseña.
+     */
+    fun encryptActiveNote(password: String) {
+        val current = _activeNote.value ?: return
+        activeNoteSessionPassword = password
+        val updated = current.copy(isEncrypted = true, updatedAt = System.currentTimeMillis())
+        _activeNote.value = updated
+        saveNoteAsync(updated, debounce = false)
+    }
+
+    /**
+     * Remueve la protección por contraseña de la nota activa y la guarda en texto plano.
+     */
+    fun removeActiveNoteEncryption() {
+        val current = _activeNote.value ?: return
+        activeNoteSessionPassword = null
+        val updated = current.copy(isEncrypted = false, updatedAt = System.currentTimeMillis())
+        _activeNote.value = updated
+        saveNoteAsync(updated, debounce = false)
     }
 
     fun createNewNote() {
@@ -274,25 +325,43 @@ class NotesViewModel(
      */
     fun closeActiveNote() {
         val current = _activeNote.value
+        val sessionPassword = activeNoteSessionPassword
         _activeNote.value = null
+        activeNoteSessionPassword = null
         if (current != null) {
             saveJob?.cancel()
             viewModelScope.launch(Dispatchers.IO) {
-                repository.update(current)
+                val toPersist = if (current.isEncrypted && !sessionPassword.isNullOrEmpty()) {
+                    val encryptedPayload = NativeEngine.encryptNote(current.content, sessionPassword)
+                    current.copy(content = encryptedPayload)
+                } else {
+                    current
+                }
+                repository.update(toPersist)
             }
         }
     }
 
     private fun saveNoteAsync(note: Note, debounce: Boolean = true) {
         saveJob?.cancel()
+        val sessionPassword = activeNoteSessionPassword
+        val prepareNoteForPersistence = {
+            if (note.isEncrypted && !sessionPassword.isNullOrEmpty()) {
+                val encrypted = NativeEngine.encryptNote(note.content, sessionPassword)
+                note.copy(content = encrypted)
+            } else {
+                note
+            }
+        }
+
         if (debounce) {
             saveJob = viewModelScope.launch(Dispatchers.IO) {
                 delay(500L)
-                repository.update(note)
+                repository.update(prepareNoteForPersistence())
             }
         } else {
             viewModelScope.launch(Dispatchers.IO) {
-                repository.update(note)
+                repository.update(prepareNoteForPersistence())
             }
         }
     }

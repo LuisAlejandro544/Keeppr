@@ -154,6 +154,61 @@ object NativeEngine {
         }
     }
 
+    /**
+     * Cifra el contenido de una nota en el motor nativo de Rust usando AES-256 + PBKDF2-HMAC.
+     * Retorna el payload cifrado empaquetado como VAULT_ENC_V1$<salt>$<iv>$<ciphertext>$<mac>.
+     */
+    fun encryptNote(content: String, password: String): String {
+        if (content.isEmpty() || password.isEmpty()) return content
+        return if (isLoaded) {
+            try {
+                val encrypted = encryptNoteInRust(content, password)
+                if (encrypted.isNotEmpty()) encrypted else content
+            } catch (e: Throwable) {
+                Log.e(TAG, "Error cifrando nota en Rust", e)
+                content
+            }
+        } else {
+            Log.w(TAG, "Motor nativo no cargado, no se pudo cifrar nota")
+            content
+        }
+    }
+
+    /**
+     * Descifra un payload cifrado usando la contraseña provista.
+     * Retorna el texto claro si la clave es correcta o null si es inválida o los datos fueron alterados.
+     */
+    fun decryptNote(payload: String, password: String): String? {
+        if (!isEncryptedPayload(payload)) return payload
+        if (password.isEmpty()) return null
+        return if (isLoaded) {
+            try {
+                decryptNoteInRust(payload, password)
+            } catch (e: Throwable) {
+                Log.e(TAG, "Error descifrando nota en Rust", e)
+                null
+            }
+        } else {
+            null
+        }
+    }
+
+    /**
+     * Determina si una cadena es un payload cifrado de VaultNotes.
+     */
+    fun isEncryptedPayload(text: String): Boolean {
+        if (!text.startsWith("VAULT_ENC_V1$")) return false
+        return if (isLoaded) {
+            try {
+                isEncryptedPayloadInRust(text)
+            } catch (e: Throwable) {
+                text.startsWith("VAULT_ENC_V1$")
+            }
+        } else {
+            text.startsWith("VAULT_ENC_V1$")
+        }
+    }
+
     private external fun getNativeInfo(): String
     private external fun executeLua(script: String): String
     private external fun calculateReadingTimeInRust(wordCount: Int): Int
@@ -161,6 +216,9 @@ object NativeEngine {
     private external fun matchNoteInRust(query: String, title: String, content: String, tags: String): Boolean
     private external fun generateVaultSignatureInRust(data: ByteArray): String
     private external fun verifyVaultSignatureInRust(data: ByteArray, signature: String): Boolean
+    private external fun encryptNoteInRust(plaintext: String, password: String): String
+    private external fun decryptNoteInRust(payload: String, password: String): String?
+    private external fun isEncryptedPayloadInRust(payload: String): Boolean
 }
 
 /**

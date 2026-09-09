@@ -7,3 +7,6 @@ edition = "2021"
 crate-type = ["staticlib"]
 
 [dependencies]
+aes-gcm = { version = "0.10", default-features = false, features = ["aes", "alloc"] }
+argon2 = { version = "0.5", default-features = false, features = ["alloc"] }
+rand_core = { version = "0.6", default-features = false }

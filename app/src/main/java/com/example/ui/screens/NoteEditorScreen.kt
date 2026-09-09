@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
@@ -41,10 +42,17 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Label
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.AlertDialog
+import com.example.ui.components.EncryptNoteDialog
+import com.example.ui.components.RemoveEncryptionDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -84,6 +92,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
@@ -117,6 +126,8 @@ fun NoteEditorScreen(
     onDeleteNote: () -> Unit,
     onExportMarkdown: (Uri) -> Unit = {},
     onExportVaultZip: (Uri) -> Unit = {},
+    onEncryptNote: (password: String) -> Unit = {},
+    onRemoveEncryption: () -> Unit = {},
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -126,6 +137,9 @@ fun NoteEditorScreen(
     var showTagsEditor by remember { mutableStateOf(false) }
     var showFontDialog by remember { mutableStateOf(false) }
     var showExportDialog by remember { mutableStateOf(false) }
+    var showEncryptDialog by remember { mutableStateOf(false) }
+    var showRemoveEncryptionDialog by remember { mutableStateOf(false) }
+    var showOptionsMenu by remember { mutableStateOf(false) }
 
     val exportMarkdownLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("text/markdown")
@@ -200,11 +214,11 @@ fun NoteEditorScreen(
                     }
                 },
                 title = {
-                    // Segmented Button: Edit vs Preview
+                    // Selector de modo Editar vs Vista Previa adaptable y con espaciado óptimo
                     SingleChoiceSegmentedButtonRow(
                         modifier = Modifier
-                            .fillMaxWidth(0.9f)
-                            .height(38.dp)
+                            .wrapContentWidth()
+                            .height(36.dp)
                     ) {
                         SegmentedButton(
                             shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
@@ -213,17 +227,23 @@ fun NoteEditorScreen(
                             icon = {},
                             modifier = Modifier.testTag("mode_edit_button")
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center,
+                                modifier = Modifier.padding(horizontal = 4.dp)
+                            ) {
                                 Icon(
                                     imageVector = Icons.Default.Edit,
                                     contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
+                                    modifier = Modifier.size(15.dp)
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
                                     text = stringResource(R.string.edit_mode),
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium
+                                    style = MaterialTheme.typography.labelMedium,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
@@ -235,45 +255,48 @@ fun NoteEditorScreen(
                             icon = {},
                             modifier = Modifier.testTag("mode_preview_button")
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center,
+                                modifier = Modifier.padding(horizontal = 4.dp)
+                            ) {
                                 Icon(
                                     imageVector = Icons.Default.Visibility,
                                     contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
+                                    modifier = Modifier.size(15.dp)
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
                                     text = stringResource(R.string.preview_mode),
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium
+                                    style = MaterialTheme.typography.labelMedium,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
                     }
                 },
                 actions = {
+                    // 1. Candado de cifrado / seguridad
                     IconButton(
-                        onClick = { showFontDialog = true },
-                        modifier = Modifier.testTag("editor_select_font_button")
+                        onClick = {
+                            if (note.isEncrypted) {
+                                showRemoveEncryptionDialog = true
+                            } else {
+                                showEncryptDialog = true
+                            }
+                        },
+                        modifier = Modifier.testTag("toggle_encryption_button")
                     ) {
                         Icon(
-                            imageVector = Icons.Default.FormatSize,
-                            contentDescription = stringResource(R.string.select_typography),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            imageVector = if (note.isEncrypted) Icons.Default.Lock else Icons.Default.LockOpen,
+                            contentDescription = if (note.isEncrypted) stringResource(R.string.remove_encryption_title) else stringResource(R.string.encrypt_note_title),
+                            tint = if (note.isEncrypted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
 
-                    IconButton(
-                        onClick = { showExportDialog = true },
-                        modifier = Modifier.testTag("export_note_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.FileDownload,
-                            contentDescription = stringResource(R.string.export_note),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-
+                    // 2. Fijar / Desfijar nota
                     IconButton(
                         onClick = onTogglePin,
                         modifier = Modifier.testTag("toggle_pin_button")
@@ -285,15 +308,77 @@ fun NoteEditorScreen(
                         )
                     }
 
-                    IconButton(
-                        onClick = { showDeleteDialog = true },
-                        modifier = Modifier.testTag("delete_note_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = stringResource(R.string.delete_note),
-                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.85f)
-                        )
+                    // 3. Menú de más opciones para evitar saturar la barra en pantallas móviles
+                    Box {
+                        IconButton(
+                            onClick = { showOptionsMenu = true },
+                            modifier = Modifier.testTag("editor_more_options_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MoreVert,
+                                contentDescription = stringResource(R.string.more_options),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        DropdownMenu(
+                            expanded = showOptionsMenu,
+                            onDismissRequest = { showOptionsMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.select_typography)) },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.FormatSize,
+                                        contentDescription = null
+                                    )
+                                },
+                                onClick = {
+                                    showOptionsMenu = false
+                                    showFontDialog = true
+                                },
+                                modifier = Modifier.testTag("editor_select_font_button")
+                            )
+
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.export_note)) },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.FileDownload,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                },
+                                onClick = {
+                                    showOptionsMenu = false
+                                    showExportDialog = true
+                                },
+                                modifier = Modifier.testTag("export_note_button")
+                            )
+
+                            HorizontalDivider()
+
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        text = stringResource(R.string.delete_note),
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                },
+                                onClick = {
+                                    showOptionsMenu = false
+                                    showDeleteDialog = true
+                                },
+                                modifier = Modifier.testTag("delete_note_button")
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -346,6 +431,36 @@ fun NoteEditorScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
+                if (note.isEncrypted) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                        modifier = Modifier
+                            .padding(bottom = 8.dp)
+                            .testTag("encrypted_note_badge")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Lock,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = stringResource(R.string.encrypted_badge),
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            )
+                        }
+                    }
+                }
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
@@ -724,6 +839,26 @@ fun NoteEditorScreen(
                 TextButton(onClick = { showExportDialog = false }) {
                     Text(stringResource(R.string.cancel))
                 }
+            }
+        )
+    }
+
+    if (showEncryptDialog) {
+        EncryptNoteDialog(
+            onDismiss = { showEncryptDialog = false },
+            onConfirm = { password ->
+                showEncryptDialog = false
+                onEncryptNote(password)
+            }
+        )
+    }
+
+    if (showRemoveEncryptionDialog) {
+        RemoveEncryptionDialog(
+            onDismiss = { showRemoveEncryptionDialog = false },
+            onConfirm = {
+                showRemoveEncryptionDialog = false
+                onRemoveEncryption()
             }
         )
     }

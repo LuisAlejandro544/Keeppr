@@ -1,65 +1,47 @@
-feat(export-import): agregar importación y exportación universal en Markdown (.md) y paquetes de bóveda (.zip) firmados con SHA-256 nativo
+feat(crypto): integrar sistema de cifrado nativo de notas con contraseña protegida por AES-256 y PBKDF2 en Rust/C++
 
-- Exportación dual de notas en NoteEditorScreen.kt:
-  * Exportación a Markdown plano universal (.md) compatible con Obsidian, Notion y editores externos mediante Storage Access Framework (SAF).
-  * Exportación a Paquetes de Bóveda (.zip) con estructura completa: note.md, vault_meta.json (metadatos, icono, etiquetas, tipografía) y signature.vault.
-- Firma criptográfica nativa de integridad (SHA-256):
-  * Implementación nativa de alta velocidad en C++ (native-bridge.cpp) y Rust (lib.rs) con SHA-256 y salt de autenticidad para computar firmas de paquetes.
-  * Verificación en tiempo constante (constant-time compare) para mitigar ataques de temporización (timing attacks).
-  * Puente JNI en NativeEngine.kt para generación y validación transparente de firmas criptográficas.
-- Importación universal con validación automática (VaultPackageHelper.kt):
-  * Soporte para importar archivos .md, .txt y paquetes .zip directamente desde NotesListScreen.kt.
-  * Reconocimiento automático de firmas auténticas de VaultNotes, restaurando metadatos completos y tipografías personalizadas.
-  * Extracción tolerante a fallos para archivos ZIP estándar o no firmados.
-- Notificaciones de resultado táctiles y no bloqueantes en MainActivity.kt y cadenas i18n en strings.xml.
+- Motor criptográfico nativo en Rust y C++ (lib.rs, rust_shim.c y native-bridge.cpp):
+  * Cifrado simétrico robusto AES-256-CBC con relleno estándar PKCS#7 y generación de vector de inicialización (IV) criptográficamente seguro de 16 bytes.
+  * Derivación de clave PBKDF2-HMAC-SHA256 con 10,000 iteraciones y sal (salt) pseudoaleatoria de 16 bytes para mitigar ataques de fuerza bruta y tablas arcoíris.
+  * Autenticación de integridad mediante HMAC-SHA256 (32 bytes) verificada en tiempo constante (constant-time compare) para prevenir ataques de temporización (timing attacks).
+  * Formato estructurado de carga útil segura: `VAULT_ENC_V1$<salt_hex>$<iv_hex>$<ciphertext_hex>$<mac_hex>`.
+  * Funciones nativas `rust_encrypt_note`, `rust_decrypt_note` y `rust_is_encrypted_payload` enlazadas vía JNI en NativeEngine.kt con soporte multiplataforma para arm64-v8a, armeabi-v7a y x86_64.
 
----
+- Capa de persistencia local en Room (AppDatabase.kt y Note.kt):
+  * Añadido campo `isEncrypted: Boolean = false` a la entidad `Note`.
+  * Elevada la versión de la base de datos local SQLite a versión 3.
+  * Implementada migración automática `MIGRATION_2_3` (`ALTER TABLE notes ADD COLUMN isEncrypted INTEGER NOT NULL DEFAULT 0`) para preservar todas las notas existentes sin pérdida de datos.
 
-feat(ui-animations): agregar animaciones fluidas de lista, microinteracciones táctiles y transiciones en tareas Markdown
+- Seguridad y gestión de contraseñas en memoria (NotesViewModel.kt):
+  * Gestión de sesión efímera `activeNoteSessionPassword` en memoria volátil; la contraseña del usuario nunca se persiste en disco ni en SQLite.
+  * Cifrado y descifrado al vuelo: al persistir notas protegidas (`saveNoteAsync` y `closeActiveNote`), el contenido se cifra automáticamente antes de escribirse en Room.
+  * Al cerrar o cambiar de nota, la contraseña en memoria se purga inmediatamente.
+  * Búsqueda segura (`filteredNotes`): el contenido de notas protegidas queda excluido de los filtros de texto para prevenir fugas de información sensible en texto claro.
 
-- Reordenamiento y filtrado animado en LazyColumn (NotesListScreen.kt):
-  * Integrado Modifier.animateItem() en todos los elementos de notas fijadas, notas regulares y encabezados de sección.
-  * Transición fluida de recolocación a 60/120 FPS al filtrar por búsqueda de texto o chips de etiqueta #tag, y al fijar/desfijar notas.
-- Microinteracciones táctiles elásticas en tarjetas de notas (NoteCard):
-  * Detección de pulsación táctil con MutableInteractionSource y collectIsPressedAsState().
-  * Efecto de presión y rebote elástico (Spring Scale) usando animateFloatAsState con dampingRatio = Spring.DampingRatioMediumBouncy (escalado sutil de 1.0 a 0.965).
-  * Rotación y presencia animada del icono de chincheta/pin (PushPin) al alternar su estado de fijado mediante rotate(pinAngle).
-- Animación interactiva en checkboxes y tareas Markdown (MarkdownRenderer.kt):
-  * Microanimación de rebote al pulsar cada casilla de verificación de tarea [ ] / [x] con animateFloatAsState (escala reactiva a 1.08).
-  * Transición suave de color y opacidad en el texto completado (animateColorAsState y animateFloatAsState con alpha a 0.65) acompañando el tachado de línea.
+- Componentes visuales y diálogos en Jetpack Compose (EncryptionDialogs.kt):
+  * `EncryptNoteDialog`: Diálogo modal para solicitar contraseña y confirmación, con validación de longitud mínima y chequeo de coincidencia en tiempo real.
+  * `DecryptNoteDialog`: Diálogo de desbloqueo con campo de contraseña oculta y respuesta visual en caso de contraseña incorrecta o intento fallido.
+  * `RemoveEncryptionDialog`: Diálogo de confirmación para eliminar la protección por contraseña y guardar la nota en texto plano.
 
----
+- Integración en la experiencia de usuario (NotesListScreen.kt, NoteEditorScreen.kt y MainActivity.kt):
+  * Tarjetas de lista (`NoteCard`): Indicador de candado en el encabezado y snippet protegido ("Contenido protegido con contraseña"), solicitando desbloqueo modal antes de acceder al editor.
+  * Editor de notas: Acción de candado en la barra superior que abre el diálogo de protección si la nota es pública, o el diálogo para retirar la protección si ya está cifrada; etiqueta visual de nota protegida junto al título.
+  * Cadenas de texto internacionalizadas en `strings.xml` y arquitectura 100% desconectada y offline sin dependencias externas ni servicios en la nube.
 
-feat(settings): agregar diálogo de ajustes con soporte para modo claro, oscuro, Material You y paletas de acento
+- Corrección visual y rediseño responsivo de la barra superior en pantallas móviles (NoteEditorScreen.kt):
+  * Solucionado el problema de diseño donde el selector de modo "Editar" vs "Vista Previa" se comprimía y cortaba las letras debido a la sobrecarga de botones en la TopAppBar.
+  * Reorganizadas las acciones de la barra superior siguiendo las guías de Material Design 3 para pantallas móviles: acciones prioritarias directas (candado de protección y fijar nota) y menú de desbordamiento (`DropdownMenu` vía icono `MoreVert`) para tipografía, exportación y eliminación.
+  * Selector de modo fluido (`SingleChoiceSegmentedButtonRow`) con ancho auto-ajustable (`wrapContentWidth`), altura compacta de 36dp, iconos optimizados y tipografía `labelMedium` con `TextOverflow.Ellipsis`, garantizando legibilidad total sin recortes en cualquier resolución o tamaño de pantalla.
+  * Añadida cadena de texto `more_options` en `strings.xml` para accesibilidad.
 
-- Ajustes visuales y temas dinámicos en Jetpack Compose (Theme.kt y ThemePreferences.kt):
-  * Soporte completo para 3 modos de visualización: Sistema (isSystemInDarkTheme), Claro y Oscuro.
-  * Compatibilidad con Material You dinámico (dynamicDarkColorScheme / dynamicLightColorScheme) en Android 12+ (API 31+).
-  * Paletas de acento personalizadas (Obsidian Púrpura, Esmeralda Cripto, Ámbar Cálido, Azul Zafiro y Rosa Neón) cuando Material You está desactivado o en Android 8 a 11 (API 26-30).
-- Diálogo modal interactivo de ajustes (SettingsDialog.kt):
-  * Selector de tarjetas táctiles para modo de tema (Sistema, Claro, Oscuro) con áreas mínimas de 48dp.
-  * Interruptor (Switch) para habilitar o deshabilitar Material You dinámico con validación de versión de Android.
-  * Selector mediante FilterChip para paletas de color de acento y tipografía global de la aplicación.
-  * Accesible directamente desde la barra superior de la pantalla principal (NotesListScreen.kt) mediante un icono de paleta.
-- Persistencia reactiva y desacoplada en NotesViewModel.kt y MainActivity.kt:
-  * Almacenamiento local e inmediato de preferencias (selected_theme_mode, use_dynamic_color, selected_accent_palette) mediante SharedPreferences.
-  * Flujos reactivos de StateFlow conectados a MyApplicationTheme en MainActivity para actualizar la UI en vivo sin parpadeos ni reinicios de actividad.
-- Actualización de documentación técnica (README.md, ROADMAP.md, STRUCTURE.md, AI_CONTEXT.md) reflejando la nueva capacidad sin alterar el pipeline nativo.
+- Identidad de marca independiente, renombrado a Keeppr e icono Moleskine:
+  * Renombrado oficial de la aplicación a **Keeppr** en recursos Android (`strings.xml`), configuración de Gradle (`settings.gradle.kts`) y metadatos de plataforma (`metadata.json`).
+  * Actualizado el identificador de paquete (`applicationId`) a `com.keeppr.notes` en `app/build.gradle.kts`, eliminando cualquier referencia a `.aistudio` y estableciendo la ruta del directorio del almacenamiento en `Android/data/com.keeppr.notes`.
+  * Integrado el nuevo icono de lanzador adaptativo para Android basado en el concepto de libreta de tapa dura personal con banda elástica vertical de cierre (estilo Moleskine) centrado en `ic_launcher_foreground.xml` (`ic_keeppr_logo`) sobre fondo de degradado profundo (`ic_launcher_background.xml`).
+  * Actualizada toda la documentación técnica del proyecto (`README.md`, `ROADMAP.md`, `STRUCTURE.md` y `AI_CONTEXT.md`) para reflejar la nueva identidad y nomenclatura.
 
----
-
-perf(navigation): optimizar transición de salida del editor y desacoplar renderizado de notas con corrutinas y caché JNI
-
-- Desacople y ejecución no bloqueante de corrutinas en el ViewModel (NotesViewModel.kt):
-  * En closeActiveNote(), se libera el estado activo (_activeNote.value = null) en el frame cero para disparar la animación de navegación al instante, sin esperar la escritura en SQLite.
-  * La sincronización con Room (repository.update) se despacha de forma completamente asíncrona en Dispatchers.IO tras cancelar cualquier tarea diferida (debounce) pendiente.
-- Liberación instantánea de teclado virtual (IME) y foco en NoteEditorScreen.kt:
-  * Integrados LocalFocusManager y LocalSoftwareKeyboardController para ocultar el teclado y limpiar el foco antes de disparar el evento de regreso.
-  * Unificado el manejador de salida tanto en el botón de la barra superior como en el botón/gesto de retroceso de Android (BackHandler), eliminando congelamientos causados por el desmonte de la sesión del teclado.
-- Aceleración y caché de renderizado en llamadas nativas (NativeEngine.kt):
-  * Implementada una caché LRU en memoria (LruCache<Int, NoteSummary>) para los resúmenes y métricas de notas procesados por el motor Rust.
-  * Precompiladas las expresiones regulares (FONT_TAG_REGEX y WHITESPACE_REGEX) a nivel estático para evitar sobrecargar el Garbage Collector (GC) de la JVM.
-  * Al volver a la lista principal, las tarjetas se dibujan de inmediato sin cruzar repetidamente el puente JNI por cada nota.
-- Transiciones direccionales fluidas a 60 FPS en MainActivity.kt:
-  * Reemplazado el desvanecimiento genérico por transiciones con deslizamiento horizontal direccional (slideInHorizontally / slideOutHorizontally) y curvas tween rápidas de 180 ms para una navegación instantánea y reactiva en pantallas táctiles móviles.
-
+- Script autónomo de conversión JPG a WebP y migración del logo de la aplicación:
+  * Creado el script ejecutable `convert_jpg_to_webp.sh` con detección automática multiruta de herramientas nativas (`cwebp`, `ffmpeg` con `libwebp`, o ImageMagick `convert`), compresión de máxima calidad sin pérdida visible (esfuerzo de compresión 6 / calidad 100) y modo opcional `--lossless`.
+  * Probada y verificada la conversión del logo oficial de Keeppr: reducción del 78.7% de peso de archivo (de 388.98 KB en JPG a 82.68 KB en WebP) preservando el 100% de la fidelidad visual.
+  * Configurado el recurso `ic_keeppr_logo.webp` como el logo e icono adaptativo principal de la aplicación en `app/src/main/res/drawable/ic_launcher_foreground.xml`.
+  * Actualizada la documentación del proyecto (`README.md`, `ROADMAP.md`, `STRUCTURE.md`, `AI_CONTEXT.md`) con las instrucciones de uso del script y la arquitectura de recursos gráficos en WebP.

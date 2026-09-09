@@ -19,6 +19,9 @@ uint32_t rust_calculate_reading_time_secs(uint32_t word_count);
 uint32_t rust_count_words(const char* text);
 char* rust_process_note_summary(const char* content, uint32_t max_snippet_len);
 bool rust_match_note(const char* query, const char* title, const char* content, const char* tags);
+char* rust_encrypt_note(const char* content, const char* password);
+char* rust_decrypt_note(const char* payload, const char* password);
+bool rust_is_encrypted_payload(const char* payload);
 }
 
 extern "C" JNIEXPORT jstring JNICALL
@@ -309,5 +312,75 @@ Java_com_example_native_NativeEngine_verifyVaultSignatureInRust(
 
     env->ReleaseByteArrayElements(data, bytes, JNI_ABORT);
     return static_cast<jboolean>(verified);
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_example_native_NativeEngine_encryptNoteInRust(
+        JNIEnv* env,
+        jobject /* this */,
+        jstring plaintext,
+        jstring password) {
+    if (plaintext == nullptr || password == nullptr) {
+        return env->NewStringUTF("");
+    }
+
+    const char* nativePlaintext = env->GetStringUTFChars(plaintext, nullptr);
+    const char* nativePassword = env->GetStringUTFChars(password, nullptr);
+
+    char* encrypted = rust_encrypt_note(nativePlaintext, nativePassword);
+
+    env->ReleaseStringUTFChars(plaintext, nativePlaintext);
+    env->ReleaseStringUTFChars(password, nativePassword);
+
+    if (encrypted == nullptr) {
+        return env->NewStringUTF("");
+    }
+
+    jstring result = env->NewStringUTF(encrypted);
+    free(encrypted);
+    return result;
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_example_native_NativeEngine_decryptNoteInRust(
+        JNIEnv* env,
+        jobject /* this */,
+        jstring payload,
+        jstring password) {
+    if (payload == nullptr || password == nullptr) {
+        return nullptr;
+    }
+
+    const char* nativePayload = env->GetStringUTFChars(payload, nullptr);
+    const char* nativePassword = env->GetStringUTFChars(password, nullptr);
+
+    char* decrypted = rust_decrypt_note(nativePayload, nativePassword);
+
+    env->ReleaseStringUTFChars(payload, nativePayload);
+    env->ReleaseStringUTFChars(password, nativePassword);
+
+    if (decrypted == nullptr) {
+        return nullptr;
+    }
+
+    jstring result = env->NewStringUTF(decrypted);
+    free(decrypted);
+    return result;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_example_native_NativeEngine_isEncryptedPayloadInRust(
+        JNIEnv* env,
+        jobject /* this */,
+        jstring payload) {
+    if (payload == nullptr) {
+        return JNI_FALSE;
+    }
+
+    const char* nativePayload = env->GetStringUTFChars(payload, nullptr);
+    bool isEncrypted = rust_is_encrypted_payload(nativePayload);
+    env->ReleaseStringUTFChars(payload, nativePayload);
+
+    return isEncrypted ? JNI_TRUE : JNI_FALSE;
 }
 
