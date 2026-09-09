@@ -75,11 +75,24 @@ Plan de evolución técnica y funcional para la aplicación Keeppr (anteriorment
 
 ---
 
-## 📍 Fase 5: Distribución y Optimización para Tiendas de Terceros (Planeada 📅)
+## 📍 Fase 5: Distribución Beta y Pipeline de Release (En Curso 🔄)
 
-- [ ] Empaquetado APK standalone sin dependencias de Google Play Services, optimizado para plataformas como Uptodown, F-Droid y APKMirror.
-- [ ] Pruebas de compatibilidad en dispositivos Android Go y procesadores de gama baja a media.
-- [ ] Documentación para empaquetadores comunitarios e integradores de código abierto.
+- [x] **Lanzamiento de Versión Beta Oficial:** Versión `v0.1.0-b` configurada en `build.gradle.kts`.
+- [x] **Pipeline de Compilación Release Beta (`build-release.yml`):**
+  * Disparador condicional estricto: se activa exclusivamente ante eventos de Pre-Release en GitHub con sufijo `-b` (ej. `v0.1.0-b`) o ejecución manual (`workflow_dispatch`).
+  * Compilación nativa completa (Kotlin + C++ + Rust multiarquitectura arm64/armv7/x86_64 + Lua 5.4.6).
+  * Soporte para firma con credenciales de producción vía GitHub Secrets (`RELEASE_KEYSTORE_BASE64`, etc.) con contingencia autofirmada.
+  * Compilación de Release sin R8/ProGuard (`isMinifyEnabled = false`) para máxima estabilidad durante el inicio de la beta.
+  * Publicación y adjuntado automático del APK a la Pre-Release de GitHub.
+- [x] **Pipeline y Archivo de Registro de Cambios Beta:**
+  * Flujo automatizado `process-changelog-beta.yml` activado ante Pre-Releases con sufijo `-b`, publicando automáticamente el contenido de `Chanelog-beta.md` en el cuerpo de la release de GitHub.
+  * Registro de capacidades `Chanelog-beta.md` con las 7 dimensiones clave del sistema.
+- [x] **Optimización de CI y Pulido de UI para Beta:**
+  * Compilación de Debug APK (`build-debug.yml`) convertida a ejecución manual (`workflow_dispatch`), liberando cuota de CI y evitando compilaciones automáticas por commit.
+  * Remoción del modal de prueba redundante "Motores Nativos" de la barra principal de notas, manteniendo el soporte completo de Lua 5.4.6 enfocado en el editor (`LuaScriptDialog`).
+- [ ] Pruebas de compatibilidad en dispositivos Android Go y procesadores de 32 bits en hardware real.
+- [ ] Habilitación y ajuste gradual de reglas de R8/ProGuard para reducción de peso sin romper JNI en versiones posteriores.
+- [ ] Distribución del APK Beta en Uptodown y apertura de canales de feedback comunitarios (Discord / Telegram / Reddit).
 
 ---
 

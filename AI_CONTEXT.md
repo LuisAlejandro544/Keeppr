@@ -7,6 +7,7 @@ Este documento provee el contexto técnico, limitaciones del entorno y directric
 ## 🎯 Perfil del Proyecto y del Usuario
 
 - **Propósito:** Keeppr es una aplicación de notas y bóveda local de alta velocidad escrita en Kotlin y Jetpack Compose, potenciada con un backend nativo multinúcleo en C++, Rust y Lua.
+- **Versión Oficial Actual:** `v0.1.0-b` (Beta) orientada a pruebas comunitarias y distribución en APK independiente.
 - **Identidad e Identificador de Paquete:** Su nombre público es **Keeppr** y su `applicationId` es `com.keeppr.notes`, garantizando almacenamiento limpio y profesional en `Android/data/com.keeppr.notes` sin dependencias ni referencias externas.
 - **Icono de Lanzador:** Icono adaptativo basado en una libreta/cuaderno de tapa dura personal con banda elástica vertical (estilo Moleskine), optimizado en formato WebP de máxima calidad y alta compresión (`ic_keeppr_logo.webp`), administrable mediante el script autónomo `convert_jpg_to_webp.sh`.
 - **Perfil del Usuario:** El usuario opera y prueba desde un dispositivo móvil/teléfono sin acceso a una estación de trabajo PC tradicional. Por ello, todos los comandos, scripts y salidas deben ser directos, robustos y sin fricciones.
@@ -32,8 +33,12 @@ Este documento provee el contexto técnico, limitaciones del entorno y directric
 - **Importación y Exportación Universal:**
   - *Exportación:* Modo Markdown (.md) plano universal para sincronización con Obsidian/Notion/PC, y modo Paquete de Bóveda (.zip) con `note.md`, `vault_meta.json` (metadatos completos y tipografía asignada) y `signature.vault` (firma SHA-256 nativa).
   - *Importación:* Soporta archivos `.md`, `.txt` y paquetes `.zip` con verificación automática de firma para garantizar la autenticidad e integridad de la nota importada.
-- **Integridad del Pipeline de Compilación:**
+- **Integridad del Pipeline de Compilación y CI/CD:**
   - C++, Rust y Lua están integrados de forma obligatoria en Gradle y CMake. Si se solicitan nuevas funciones nativas, deben implementarse respetando esta cadena de herramientas sin omitirlas ni sustituirlas por soluciones simuladas en Kotlin.
+  - Flujo `build-release.yml` en GitHub Actions para compilación de APKs Release, disparado ante Pre-Releases con etiqueta terminada en `-b` (ej. `v0.1.0-b`). Sin ofuscación R8/ProGuard (`isMinifyEnabled = false`) para estabilidad en la beta.
+  - Gestión de credenciales de firma vía GitHub Secrets (`RELEASE_KEYSTORE_BASE64`, `RELEASE_STORE_PASSWORD`, `RELEASE_KEY_ALIAS`, `RELEASE_KEY_PASSWORD`).
+  - Flujo `process-changelog-beta.yml` que inyecta automáticamente el contenido de `Chanelog-beta.md` en la descripción del Pre-Release con etiqueta `-b`.
+  - Flujo `build-debug.yml` ejecutado exclusivamente de forma manual (`workflow_dispatch`) para evitar compilaciones automáticas por commit.
 
 ---
 

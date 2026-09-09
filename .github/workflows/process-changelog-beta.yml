@@ -1,0 +1,49 @@
+name: Publish Beta Changelog to Pre-Release
+
+on:
+  release:
+    types: [prereleased]
+  workflow_dispatch:
+
+jobs:
+  publish-changelog:
+    name: Update Pre-Release Notes with Changelog
+    # Se activa exclusivamente si es un pre-release cuya etiqueta termine en '-b' o ejecución manual
+    if: github.event_name == 'workflow_dispatch' || (github.event.release.prerelease == true && endsWith(github.event.release.tag_name, '-b'))
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: 1. Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: 2. Verificar existencia y contenido de Chanelog-beta.md
+        run: |
+          echo "=== Inspeccionando Chanelog-beta.md ==="
+          if [ -f "Chanelog-beta.md" ]; then
+            echo "✅ Archivo Chanelog-beta.md encontrado."
+            echo "--------------------------------------------------"
+            cat Chanelog-beta.md
+            echo "--------------------------------------------------"
+          else
+            echo "❌ Error: Chanelog-beta.md no existe en la raíz del repositorio."
+            exit 1
+          fi
+
+      - name: 3. Publicar contenido de Chanelog-beta.md en la descripción del Pre-Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.release.tag_name }}
+          body_path: Chanelog-beta.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 4. Subir Chanelog-beta.md como artefacto de respaldo
+        uses: actions/upload-artifact@v4
+        with:
+          name: Keeppr-Chanelog-Beta
+          path: Chanelog-beta.md
+          if-no-files-found: error

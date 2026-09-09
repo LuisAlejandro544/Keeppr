@@ -1,65 +1,27 @@
-feat(crypto): integrar sistema de cifrado nativo de notas con contraseña protegida por AES-256 y PBKDF2 en Rust/C++
+ci(release): configurar workflow de compilación release para pre-releases beta v0.1.0-b y procesamiento de changelog
 
-- Motor criptográfico nativo en Rust y C++ (lib.rs, rust_shim.c y native-bridge.cpp):
-  * Cifrado simétrico robusto AES-256-CBC con relleno estándar PKCS#7 y generación de vector de inicialización (IV) criptográficamente seguro de 16 bytes.
-  * Derivación de clave PBKDF2-HMAC-SHA256 con 10,000 iteraciones y sal (salt) pseudoaleatoria de 16 bytes para mitigar ataques de fuerza bruta y tablas arcoíris.
-  * Autenticación de integridad mediante HMAC-SHA256 (32 bytes) verificada en tiempo constante (constant-time compare) para prevenir ataques de temporización (timing attacks).
-  * Formato estructurado de carga útil segura: `VAULT_ENC_V1$<salt_hex>$<iv_hex>$<ciphertext_hex>$<mac_hex>`.
-  * Funciones nativas `rust_encrypt_note`, `rust_decrypt_note` y `rust_is_encrypted_payload` enlazadas vía JNI en NativeEngine.kt con soporte multiplataforma para arm64-v8a, armeabi-v7a y x86_64.
+- Pipeline de CI/CD para APK de Release (`.github/workflows/build-release.yml`):
+  * Automatización de compilación de APK en modo Release activada exclusivamente al detectar eventos de Pre-Release de GitHub con etiqueta terminada en sufijo `-b` (ej. `v0.1.0-b`) o mediante ejecución manual (`workflow_dispatch`).
+  * Entorno de compilación hermético: Java 17 Temurin, Toolchain de Rust (stable) con targets nativos para arquitecturas Android de 64 bits (`aarch64-linux-android`, `x86_64-linux-android`) y 32 bits (`armv7-linux-androideabi`), CMake 3.22.1 y NDK 26.1.10909125.
+  * Inyección segura de credenciales de firma mediante GitHub Secrets (`RELEASE_KEYSTORE_BASE64`, `RELEASE_STORE_PASSWORD`, `RELEASE_KEY_ALIAS`, `RELEASE_KEY_PASSWORD`) con decodificación al vuelo y generación de clave de contingencia autofirmada para evitar fallos de compilación si los secretos aún no han sido cargados.
+  * Compilación con `./gradlew assembleRelease` sin caché ni daemon; R8/ProGuard deshabilitado temporalmente (`isMinifyEnabled = false`) para garantizar estabilidad durante el ciclo inicial de pruebas beta.
+  * Publicación automática del artefacto (`Keeppr-Release-Beta-v0.1.0-b-APK`) y adjuntado directo del archivo APK generado a la pre-release de GitHub mediante `action-gh-release`.
 
-- Capa de persistencia local en Room (AppDatabase.kt y Note.kt):
-  * Añadido campo `isEncrypted: Boolean = false` a la entidad `Note`.
-  * Elevada la versión de la base de datos local SQLite a versión 3.
-  * Implementada migración automática `MIGRATION_2_3` (`ALTER TABLE notes ADD COLUMN isEncrypted INTEGER NOT NULL DEFAULT 0`) para preservar todas las notas existentes sin pérdida de datos.
+- Automatización de registro de cambios Beta (`.github/workflows/process-changelog-beta.yml`):
+  * Creado flujo de publicación para `Chanelog-beta.md`, activado exclusivamente ante pre-releases con sufijo `-b` o manualmente (`workflow_dispatch`).
+  * Inyección automática del contenido íntegro del changelog en las notas de la pre-release en GitHub mediante `softprops/action-gh-release@v2`.
 
-- Seguridad y gestión de contraseñas en memoria (NotesViewModel.kt):
-  * Gestión de sesión efímera `activeNoteSessionPassword` en memoria volátil; la contraseña del usuario nunca se persiste en disco ni en SQLite.
-  * Cifrado y descifrado al vuelo: al persistir notas protegidas (`saveNoteAsync` y `closeActiveNote`), el contenido se cifra automáticamente antes de escribirse en Room.
-  * Al cerrar o cambiar de nota, la contraseña en memoria se purga inmediatamente.
-  * Búsqueda segura (`filteredNotes`): el contenido de notas protegidas queda excluido de los filtros de texto para prevenir fugas de información sensible en texto claro.
+- Optimización del pipeline de depuración (`.github/workflows/build-debug.yml`):
+  * Flujo de compilación de APK Debug configurado para ejecución exclusivamente manual (`workflow_dispatch`), evitando consumo innecesario de minutos y ejecuciones automáticas en cada commit o pull request.
 
-- Componentes visuales y diálogos en Jetpack Compose (EncryptionDialogs.kt):
-  * `EncryptNoteDialog`: Diálogo modal para solicitar contraseña y confirmación, con validación de longitud mínima y chequeo de coincidencia en tiempo real.
-  * `DecryptNoteDialog`: Diálogo de desbloqueo con campo de contraseña oculta y respuesta visual en caso de contraseña incorrecta o intento fallido.
-  * `RemoveEncryptionDialog`: Diálogo de confirmación para eliminar la protección por contraseña y guardar la nota en texto plano.
+- Limpieza de interfaz de usuario en pantalla principal (`NotesListScreen.kt`):
+  * Eliminado el diálogo flotante redundante de prueba "Motores Nativos" y su botón con icono de chip en la barra superior de la lista de notas.
+  * Se mantiene la ejecución y automatización con Lua 5.4.6 en el editor de notas (`NoteEditorScreen`), donde cumple su función real para plantillas y transformaciones de texto.
 
-- Integración en la experiencia de usuario (NotesListScreen.kt, NoteEditorScreen.kt y MainActivity.kt):
-  * Tarjetas de lista (`NoteCard`): Indicador de candado en el encabezado y snippet protegido ("Contenido protegido con contraseña"), solicitando desbloqueo modal antes de acceder al editor.
-  * Editor de notas: Acción de candado en la barra superior que abre el diálogo de protección si la nota es pública, o el diálogo para retirar la protección si ya está cifrada; etiqueta visual de nota protegida junto al título.
-  * Cadenas de texto internacionalizadas en `strings.xml` y arquitectura 100% desconectada y offline sin dependencias externas ni servicios en la nube.
+- Registro de capacidades y versión oficial Beta (`Chanelog-beta.md` y `app/build.gradle.kts`):
+  * Creado el documento `Chanelog-beta.md` detallando las 7 columnas funcionales de Keeppr: cifrado criptográfico AES-256 + PBKDF2 en Rust/C++, soporte multiarquitectura de 32/64 bits, automatización con Lua 5.4.6, editor Markdown táctil, gestión de bóvedas y exportación abierta (.zip/.md), theming Material 3 con colores dinámicos y herramientas de telemetría móvil (FPS HUD, monitor de memoria y visor Logcat).
+  * Actualizada la versión oficial de la aplicación a `versionName = "0.1.0-b"` con `versionCode = 1` en `app/build.gradle.kts`.
+  * Habilitada la variable de entorno `KEY_ALIAS` en el bloque de `signingConfigs.release`.
 
-- Corrección visual y rediseño responsivo de la barra superior en pantallas móviles (NoteEditorScreen.kt):
-  * Solucionado el problema de diseño donde el selector de modo "Editar" vs "Vista Previa" se comprimía y cortaba las letras debido a la sobrecarga de botones en la TopAppBar.
-  * Reorganizadas las acciones de la barra superior siguiendo las guías de Material Design 3 para pantallas móviles: acciones prioritarias directas (candado de protección y fijar nota) y menú de desbordamiento (`DropdownMenu` vía icono `MoreVert`) para tipografía, exportación y eliminación.
-  * Selector de modo fluido (`SingleChoiceSegmentedButtonRow`) con ancho auto-ajustable (`wrapContentWidth`), altura compacta de 36dp, iconos optimizados y tipografía `labelMedium` con `TextOverflow.Ellipsis`, garantizando legibilidad total sin recortes en cualquier resolución o tamaño de pantalla.
-  * Añadida cadena de texto `more_options` en `strings.xml` para accesibilidad.
-
-- Identidad de marca independiente, renombrado a Keeppr e icono Moleskine:
-  * Renombrado oficial de la aplicación a **Keeppr** en recursos Android (`strings.xml`), configuración de Gradle (`settings.gradle.kts`) y metadatos de plataforma (`metadata.json`).
-  * Actualizado el identificador de paquete (`applicationId`) a `com.keeppr.notes` en `app/build.gradle.kts`, eliminando cualquier referencia a `.aistudio` y estableciendo la ruta del directorio del almacenamiento en `Android/data/com.keeppr.notes`.
-  * Integrado el nuevo icono de lanzador adaptativo para Android basado en el concepto de libreta de tapa dura personal con banda elástica vertical de cierre (estilo Moleskine) centrado en `ic_launcher_foreground.xml` (`ic_keeppr_logo`) sobre fondo de degradado profundo (`ic_launcher_background.xml`).
-  * Actualizada toda la documentación técnica del proyecto (`README.md`, `ROADMAP.md`, `STRUCTURE.md` y `AI_CONTEXT.md`) para reflejar la nueva identidad y nomenclatura.
-
-- Script autónomo de conversión JPG a WebP y migración del logo de la aplicación:
-  * Creado el script ejecutable `convert_jpg_to_webp.sh` con detección automática multiruta de herramientas nativas (`cwebp`, `ffmpeg` con `libwebp`, o ImageMagick `convert`), compresión de máxima calidad sin pérdida visible (esfuerzo de compresión 6 / calidad 100) y modo opcional `--lossless`.
-  * Probada y verificada la conversión del logo oficial de Keeppr: reducción del 78.7% de peso de archivo (de 388.98 KB en JPG a 82.68 KB en WebP) preservando el 100% de la fidelidad visual.
-  * Configurado el recurso `ic_keeppr_logo.webp` como el logo e icono adaptativo principal de la aplicación en `app/src/main/res/drawable/ic_launcher_foreground.xml`.
-  * Actualizada la documentación del proyecto (`README.md`, `ROADMAP.md`, `STRUCTURE.md`, `AI_CONTEXT.md`) con las instrucciones de uso del script y la arquitectura de recursos gráficos en WebP.
-
-- Corrección del fallo de compilación en la tarea Gradle :app:cargoBuild (Rust toolchain y CI/CD):
-  * Identificada y resuelta la causa raíz del error 101 en `cargoBuild`: implementada la función `compute_sha256` en `app/src/main/rust/src/lib.rs` requerida por las rutinas de hashing y verificación criptográfica.
-  * Eliminada la declaración redundante `extern "C"` anidada en `rust_encrypt_note` que provocaba conflictos de compilación en rustc.
-  * Saneado el archivo `Cargo.toml` de Rust eliminando dependencias externas innecesarias que provocaban fallos por la edición 2024 de crates transitivos (`base64ct`) en Cargo.
-  * Robustecida la tarea Gradle `cargoBuild` en `app/build.gradle.kts`: detección dinámica y resiliente del NDK de Android, configuración de variables de entorno para enlazador y archivador (`CARGO_TARGET_*_LINKER`, `AR_*`, `CC_*`), y soporte automático de generación estática para entornos sin targets preinstalados.
-  * Refactorizado `CMakeLists.txt` para enlazar `libvaultnotes_rust.a` de forma limpia eliminando duplicación de símbolos.
-  * Actualizado el nombre del artefacto descargable en el flujo de GitHub Actions (`build-debug.yml`) a `Keeppr-Debug-APK`.
-
-- feat(lua): habilitar ejecución de scripts y automatizaciones en notas con plantilla diaria y editor personalizado:
-  * Implementado método JNI `executeLuaWithContext` en C++ (`native-bridge.cpp`) y `evalLuaWithContext` en `NativeEngine.kt`, inyectando las variables globales `content` y `title` directamente en el estado oficial de Lua 5.4.6.
-  * Diseñado el componente `LuaScriptDialog.kt` en Jetpack Compose con navegación por pestañas:
-    - Pestaña de Plantillas Rápidas con generador oficial de "Plantilla de Registro Diario" en Lua con fecha, hora, checklist interactivo y secciones de notas y reflexión.
-    - Pestaña de Script Personalizado con editor monoespaciado, píldoras de atajos rápidos (`content`, `title`, `os.date()`, `return`), botón de prueba aislada con visualización diferenciada de salida/errores y 3 modos de inserción (*En el cursor*, *Al final* o *Reemplazar todo*).
-  * Integrado el acceso a scripts Lua en `NoteEditorScreen.kt` mediante el menú de desbordamiento de la barra superior y mediante un botón táctil accesible ("🪄 Lua") en la barra de herramientas `MarkdownToolbar.kt`.
-  * Añadidas cadenas internacionalizadas para el diálogo de scripts en `strings.xml`.
-  * Actualizada la documentación técnica del proyecto (`README.md`, `ROADMAP.md`, `STRUCTURE.md` y `AI_CONTEXT.md`) para documentar las nuevas capacidades del motor Lua en notas.
-
+- Documentación del repositorio actualizada:
+  * Actualizados `README.md`, `ROADMAP.md`, `STRUCTURE.md` y `AI_CONTEXT.md` reflejando la transición a la fase Beta v0.1.0-b, la guía de configuración de GitHub Secrets para la firma de APKs de release y el nuevo flujo de trabajo para pre-releases.

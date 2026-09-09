@@ -1,0 +1,120 @@
+name: Build Release APK (Beta)
+
+on:
+  release:
+    types: [prereleased]
+  workflow_dispatch:
+
+jobs:
+  build-release:
+    name: Compile & Sign Release APK (Beta)
+    # Se activa exclusivamente si es un pre-release cuya etiqueta termine en '-b' o ejecución manual
+    if: github.event_name == 'workflow_dispatch' || (github.event.release.prerelease == true && endsWith(github.event.release.tag_name, '-b'))
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: 1. Descargar código fuente del repositorio
+        uses: actions/checkout@v4
+
+      - name: 2. Configurar entorno Java (JDK 17) sin caché
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: 3. Configurar Toolchain de Rust y arquitecturas nativas (64 y 32 bits)
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          rustup target add aarch64-linux-android x86_64-linux-android armv7-linux-androideabi
+          echo "Rust version:"
+          rustc --version
+          cargo --version
+          rustup target list --installed
+
+      - name: 4. Instalar herramientas de compilación C++ y dependencias nativas
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential clang cmake ninja-build
+
+      - name: 5. Instalar Android NDK y CMake específico vía SDKManager
+        run: |
+          export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+          echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+
+          # Aceptar licencias e instalar la versión exacta requerida del NDK y CMake
+          yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+          yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" \
+            "ndk;26.1.10909125" \
+            "cmake;3.22.1"
+
+      - name: 6. Configurar Keystore de Release desde GitHub Secrets
+        env:
+          KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          STORE_PWD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          KEY_ALIAS_SECRET: ${{ secrets.RELEASE_KEY_ALIAS }}
+          KEY_PWD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          echo "=== Verificando credenciales de firma de Release ==="
+          KEYSTORE_FILE="${GITHUB_WORKSPACE}/my-upload-key.jks"
+          
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "-> Decodificando keystore de producción desde RELEASE_KEYSTORE_BASE64..."
+            echo "$KEYSTORE_BASE64" | base64 -d > "$KEYSTORE_FILE"
+            echo "KEYSTORE_PATH=$KEYSTORE_FILE" >> $GITHUB_ENV
+            echo "STORE_PASSWORD=$STORE_PWD" >> $GITHUB_ENV
+            echo "KEY_ALIAS=${KEY_ALIAS_SECRET:-upload}" >> $GITHUB_ENV
+            echo "KEY_PASSWORD=${KEY_PWD:-$STORE_PWD}" >> $GITHUB_ENV
+            echo "✅ Keystore de producción cargado exitosamente."
+          else
+            echo "⚠️ Advertencia: No se detectó el secreto RELEASE_KEYSTORE_BASE64."
+            echo "-> Generando clave autofirmada temporal de release para completar el empaquetado sin errores..."
+            keytool -genkey -v \
+              -keystore "$KEYSTORE_FILE" \
+              -alias "upload" \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -storepass "android" \
+              -keypass "android" \
+              -dname "CN=Keeppr Beta, OU=Mobile, O=Keeppr, L=Unknown, S=Unknown, C=ES"
+            echo "KEYSTORE_PATH=$KEYSTORE_FILE" >> $GITHUB_ENV
+            echo "STORE_PASSWORD=android" >> $GITHUB_ENV
+            echo "KEY_ALIAS=upload" >> $GITHUB_ENV
+            echo "KEY_PASSWORD=android" >> $GITHUB_ENV
+            echo "ℹ️ Clave temporal generada. Configura tus GitHub Secrets para la firma oficial definitiva."
+          fi
+
+      - name: 7. Configurar Gradle Wrapper si no está presente
+        run: |
+          if [ ! -f ./gradlew ]; then
+            echo "-> Generando binario gradlew localmente..."
+            gradle wrapper || (sudo apt-get install -y gradle && gradle wrapper)
+          fi
+          chmod +x ./gradlew
+
+      - name: 8. Compilar APK Release (C++ + Rust + Lua + Kotlin, SIN R8/Proguard, SIN CACHE)
+        run: |
+          ./gradlew assembleRelease \
+            --no-build-cache \
+            --no-daemon \
+            --stacktrace
+
+      - name: 9. Subir APK Release generado como artefacto descargable
+        uses: actions/upload-artifact@v4
+        with:
+          name: Keeppr-Release-Beta-v0.1.0-b-APK
+          path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+
+      - name: 10. Publicar y adjuntar APK a la Pre-Release de GitHub
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: app/build/outputs/apk/release/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

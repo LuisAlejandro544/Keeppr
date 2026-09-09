@@ -90,7 +90,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import com.example.R
 import com.example.data.model.Note
-import androidx.compose.material.icons.filled.Memory
 import com.example.native.NativeEngine
 import com.example.ui.theme.AppFontTheme
 import java.text.SimpleDateFormat
@@ -121,7 +120,6 @@ fun NotesListScreen(
     var noteToDelete by remember { mutableStateOf<Note?>(null) }
     var noteToDecrypt by remember { mutableStateOf<Note?>(null) }
     var decryptErrorMessage by remember { mutableStateOf<String?>(null) }
-    var showNativeEngineDialog by remember { mutableStateOf(false) }
 
     val handleNoteClick: (Note) -> Unit = { note ->
         if (note.isEncrypted) {
@@ -187,17 +185,6 @@ fun NotesListScreen(
                         Icon(
                             imageVector = Icons.Default.BugReport,
                             contentDescription = "Panel de Debug",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-
-                    IconButton(
-                        onClick = { showNativeEngineDialog = true },
-                        modifier = Modifier.testTag("native_engine_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Memory,
-                            contentDescription = "Motor Nativo (C++, Rust, Lua)",
                             tint = MaterialTheme.colorScheme.primary
                         )
                     }
@@ -454,109 +441,6 @@ fun NotesListScreen(
                     decryptErrorMessage = null
                 } else {
                     decryptErrorMessage = context.getString(R.string.decrypt_error_wrong_password)
-                }
-            }
-        )
-    }
-
-    // Native Engine Status & Lua Playground Dialog
-    if (showNativeEngineDialog) {
-        var luaSnippet by remember { mutableStateOf("return '¡Hola desde Lua en C! ' .. (20 + 26)") }
-        var luaResult by remember { mutableStateOf<String?>(null) }
-        val nativeInfo = remember { NativeEngine.getEngineInfo() }
-
-        AlertDialog(
-            onDismissRequest = { showNativeEngineDialog = false },
-            title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Memory,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Motores Nativos",
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-                    )
-                }
-            },
-            text = {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                            .padding(10.dp)
-                    ) {
-                        Text(
-                            text = nativeInfo,
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                                lineHeight = 18.sp
-                            )
-                        )
-                    }
-
-                    Text(
-                        text = "Probar Intérprete C Lua:",
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
-                    )
-
-                    OutlinedTextField(
-                        value = luaSnippet,
-                        onValueChange = { luaSnippet = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        shape = RoundedCornerShape(8.dp),
-                        textStyle = MaterialTheme.typography.bodySmall.copy(
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                        )
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End
-                    ) {
-                        TextButton(
-                            onClick = {
-                                luaResult = NativeEngine.evalLua(luaSnippet)
-                            },
-                            modifier = Modifier.testTag("run_lua_button")
-                        ) {
-                            Text("▶ Ejecutar Lua")
-                        }
-                    }
-
-                    if (luaResult != null) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f))
-                                .padding(8.dp)
-                        ) {
-                            Text(
-                                text = "Resultado: $luaResult",
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
-                            )
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showNativeEngineDialog = false }) {
-                    Text("Cerrar")
                 }
             }
         )

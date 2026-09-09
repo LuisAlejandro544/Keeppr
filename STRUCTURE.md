@@ -76,7 +76,9 @@ Este documento detalla el árbol de directorios, la organización de módulos y 
 │   └── libs.versions.toml                 # Catálogo de versiones de dependencias (Compose, Room, KSP, AndroidX)
 ├── build.gradle.kts                       # Configuración raíz de Gradle
 ├── settings.gradle.kts                    # Registro de módulos y repositorios Maven
-├── .github/workflows/                     # Flujos automatizados CI/CD (build-debug, override-commit)
+├── .github/workflows/                     # Flujos automatizados CI/CD (build-debug, build-release, process-changelog-beta, override-commit)
+├── Chanelog-beta.md                       # Registro de capacidades y novedades de la versión Beta v0.1.0-b
+├── commit_message.txt                     # Mensaje de confirmación sincronizado en español
 ├── setup_debug_keystore.sh                # Generador forzado y limpio de debug.keystore sin dependencias
 ├── clean_native_artifacts.sh              # Script Bash para purgar artefactos de compilación (target, .cxx, etc.)
 ├── convert_jpg_to_webp.sh                 # Script Bash utilitario para convertir imágenes JPG a WebP a máxima compresión

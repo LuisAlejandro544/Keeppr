@@ -3,8 +3,10 @@
 Aplicación móvil de gestión segura de notas y apuntes de alto rendimiento, diseñada con persistencia local robusta en Room, interfaz moderna en Jetpack Compose y un motor nativo multinúcleo en C++, Rust y Lua (C puro) compilado para distribución directa en formato APK (Uptodown y tiendas independientes).
 
 - **Nombre Oficial:** Keeppr
+- **Versión Actual:** `v0.1.0-b` (Beta)
 - **Identificador de Paquete (Application ID):** `com.keeppr.notes` (almacenamiento en `Android/data/com.keeppr.notes`)
 - **Identidad Visual / Icono:** Cuaderno de tapa dura personal con banda elástica vertical (estilo Moleskine) en formato WebP de máxima calidad y alta compresión (`ic_keeppr_logo.webp`), integrado como icono adaptativo Android sobre paleta oscura y acentos cálidos.
+- **Registro de Capacidades Beta:** Consultar `Chanelog-beta.md` para el desglose completo de novedades de la versión.
 
 ---
 
@@ -54,6 +56,29 @@ chmod +x convert_jpg_to_webp.sh
 ```bash
 gradle :app:testDebugUnitTest
 ```
+
+---
+
+## 🤖 Automatización CI/CD (GitHub Actions)
+
+El proyecto cuenta con pipelines de integración y entrega continua para compilación nativa en la nube:
+
+1. **Compilación Debug (`build-debug.yml`):** Configurado para ejecución manual (`workflow_dispatch`), compilando los núcleos nativos (C++, Rust y Lua) y empaquetando el APK de depuración como artefacto descargable cuando sea necesario, sin saturar ejecuciones con cada commit.
+2. **Compilación Release Beta (`build-release.yml`):** Se activa automáticamente al publicar un **Pre-Release en GitHub con etiqueta terminada en `-b`** (ej. `v0.1.0-b`) o mediante ejecución manual (`workflow_dispatch`). Compila las arquitecturas de 64 y 32 bits, firma el APK y lo adjunta directamente a la versión en GitHub. Actualmente sin ofuscación R8/ProGuard (`isMinifyEnabled = false`) para estabilidad beta.
+3. **Publicación de Changelog Beta (`process-changelog-beta.yml`):** Se activa automáticamente al detectar un **Pre-Release con sufijo `-b`** (o ejecución manual), inyectando el contenido completo de `Chanelog-beta.md` directamente en la descripción y notas de la versión en GitHub y archivándolo como respaldo.
+4. **Sincronización de Mensajes de Commit (`override-commit-message.yml`):** Mantiene el historial de commits alineado con el contenido de `commit_message.txt`.
+
+### 🔑 Configuración de Secretos en GitHub (GitHub Secrets)
+Para que el flujo `build-release.yml` firme el APK con tu propia clave oficial de producción, configura los siguientes secretos en tu repositorio (**Settings** > **Secrets and variables** > **Actions** > **New repository secret**):
+
+| Nombre del Secreto | Descripción | Ejemplo / Valor |
+|---|---|---|
+| `RELEASE_KEYSTORE_BASE64` | Archivo `.jks` o `.keystore` codificado en Base64 | Cadena de texto generada con `base64 -w 0 mi_llave.jks` |
+| `RELEASE_STORE_PASSWORD` | Contraseña del almacén de claves (Keystore) | `mi_password_seguro` |
+| `RELEASE_KEY_ALIAS` | Alias de la clave dentro del almacén | `upload` |
+| `RELEASE_KEY_PASSWORD` | Contraseña de la clave privada | `mi_password_seguro` |
+
+> *Nota:* Si aún no has configurado estos secretos, el workflow detectará su ausencia y generará automáticamente una clave de contingencia autofirmada para que el empaquetado no falle y puedas probar el APK de inmediato.
 
 ---
 
@@ -157,9 +182,12 @@ Para evitar que Keeppr se convierta en una aplicación sobrecargada con herramie
 │           ├── rust/             # Código fuente Rust (Cargo.toml, src/lib.rs)
 │           ├── java/com/example/ # Código Kotlin, Compose UI, ViewModels, Room DB
 │           └── res/              # Recursos visuales, temas XML y cadenas
-├── .github/workflows/            # Flujos de CI de GitHub Actions (build-debug, override-commit)
+├── .github/workflows/            # Flujos de CI de GitHub Actions (build-debug, build-release, process-changelog-beta, override-commit)
+├── Chanelog-beta.md               # Registro de capacidades y novedades de la versión Beta v0.1.0-b
+├── commit_message.txt             # Mensaje estructurado en español sincronizado con git
 ├── setup_debug_keystore.sh       # Generador autónomo y limpio de debug.keystore
 ├── clean_native_artifacts.sh     # Script para purgar artefactos pesados (target, .cxx)
+├── convert_jpg_to_webp.sh        # Utilidad de conversión de imágenes a WebP de alta fidelidad
 ├── AI_CONTEXT.md                 # Contexto de negocio y arquitectura para IAs
 ├── STRUCTURE.md                  # Especificación detallada de módulos y archivos
 ├── ROADMAP.md                    # Hoja de ruta y próximos hitos
