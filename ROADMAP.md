@@ -17,6 +17,11 @@ Plan de evolución técnica y funcional para la aplicación VaultNotes.
   - Extracción en una pasada nativa de métricas, conteo de palabras y snippets Markdown limpios (`rust_process_note_summary`).
   - Algoritmo de coincidencia y filtrado instantáneo en Rust (`rust_match_note`) coordinado con corrutinas de Kotlin en `Dispatchers.Default`.
 - [x] Diálogo interactivo en la UI para inspección de motores y ejecución dinámica de scripts Lua.
+- [x] Ajustes de apariencia y temas visuales (`SettingsDialog`):
+  - Selector de modo de tema: Sistema, Modo Claro y Modo Oscuro.
+  - Soporte para paletas dinámicas Material You en Android 12+ con interruptor on/off.
+  - Paletas de acento personalizadas (Obsidian, Esmeralda, Ámbar, Azul Zafiro, Rosa Neón) para dispositivos sin Material You o con preferencia fija.
+  - Selector de tipografía global predeterminada.
 - [x] Personalización tipográfica granular con 5 familias nativas del sistema Android (Predeterminada, Sans-Serif, Serif, Monoespaciada, Cursiva) aplicables individualmente por nota o a fragmentos específicos de texto (inline con `[font:id]...[/font]`), con vista previa interactiva y persistencia en Room (migración v2).
 - [x] Eliminación segura de notas con diálogo modal de confirmación en la UI (en tarjetas de lista y editor de notas).
 - [x] Script de mantenimiento automatizado `clean_native_artifacts.sh` para purgar carpetas `target`, `.cxx` y archivos residuales.
@@ -46,11 +51,14 @@ Plan de evolución técnica y funcional para la aplicación VaultNotes.
 
 ---
 
-## 📍 Fase 4: Respaldo Autónomo y Portabilidad (Planeada 📅)
+## 📍 Fase 4: Respaldo Autónomo y Portabilidad (En Curso 🔄)
 
-- [ ] Exportación e importación de notas en archivos planos comprimidos (`.zip` / `.tar.gz`) con checksums SHA-256 calculados en Rust.
+- [x] Exportación e importación universal de notas:
+  * Exportación a Markdown (.md) plano universal para sincronización con Obsidian, Notion y editores externos.
+  * Exportación a Paquetes de Bóveda (.zip firmado) con metadatos completos (`vault_meta.json`) y firma criptográfica de integridad SHA-256 nativa.
+  * Importación con validación de autenticidad y restauración de formato y tipografía.
 - [ ] Sincronización punto a punto (P2P) local mediante red local WiFi/Hotspot sin intermediarios ni servidores en la nube.
-- [ ] Soporte para visualización y edición en Markdown enriquecido con renderizado nativo.
+- [x] Soporte para visualización y edición en Markdown enriquecido con renderizado y checkboxes interactivos.
 
 ---
 

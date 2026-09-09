@@ -1,13 +1,17 @@
 package com.example
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,12 +26,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.local.AppDatabase
 import com.example.data.repository.NoteRepository
 import com.example.debug.InAppLogCollector
 import com.example.debug.PerformanceMonitor
+import com.example.ui.components.SettingsDialog
 import com.example.ui.debug.DebugDashboardDialog
 import com.example.ui.debug.PerformanceFloatingHud
 import com.example.ui.screens.NoteEditorScreen
@@ -47,10 +53,18 @@ class MainActivity : ComponentActivity() {
     super.onCreate(savedInstanceState)
     enableEdgeToEdge()
     setContent {
-      // Observa la tipografía persistida en vivo para propagarla a todo el árbol de Compose
+      // Observa la configuración visual y tipografía persistida para propagarla a todo el árbol de Compose
       val selectedFont by viewModel.selectedFont.collectAsStateWithLifecycle()
+      val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
+      val dynamicColor by viewModel.dynamicColor.collectAsStateWithLifecycle()
+      val accentPalette by viewModel.accentPalette.collectAsStateWithLifecycle()
 
-      MyApplicationTheme(fontTheme = selectedFont) {
+      MyApplicationTheme(
+        themeMode = themeMode,
+        dynamicColor = dynamicColor,
+        accentPalette = accentPalette,
+        fontTheme = selectedFont
+      ) {
         Surface(
           modifier = Modifier.fillMaxSize(),
           color = MaterialTheme.colorScheme.background
@@ -83,12 +97,38 @@ fun VaultNotesApp(viewModel: NotesViewModel) {
   val isHudVisible by PerformanceMonitor.isOverlayVisible.collectAsStateWithLifecycle()
   val logs by InAppLogCollector.logs.collectAsStateWithLifecycle()
   var showDebugDashboard by remember { mutableStateOf(false) }
+  var showSettingsDialog by remember { mutableStateOf(false) }
+
+  // Estados reactivos para el diálogo de ajustes
+  val selectedFont by viewModel.selectedFont.collectAsStateWithLifecycle()
+  val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
+  val dynamicColor by viewModel.dynamicColor.collectAsStateWithLifecycle()
+  val accentPalette by viewModel.accentPalette.collectAsStateWithLifecycle()
+  val context = LocalContext.current
 
   Box(modifier = Modifier.fillMaxSize()) {
-    // Navigate smoothly between Note List and Note Editor without recreating the editor on every keystroke
+    // Transición fluida y reactiva (60 FPS) entre Lista y Editor aprovechando corrutinas en segundo plano
     AnimatedContent(
       targetState = (activeNote != null),
-      transitionSpec = { fadeIn() togetherWith fadeOut() },
+      transitionSpec = {
+        if (targetState) {
+          // Entrando al editor: deslizamiento suave hacia la izquierda + desvanecimiento (180ms)
+          (slideInHorizontally(animationSpec = tween(180)) { fullWidth -> fullWidth / 4 } +
+           fadeIn(animationSpec = tween(180)))
+            .togetherWith(
+              slideOutHorizontally(animationSpec = tween(160)) { fullWidth -> -fullWidth / 4 } +
+              fadeOut(animationSpec = tween(160))
+            )
+        } else {
+          // Regresando a la lista: deslizamiento hacia la derecha + desvanecimiento rápido (180ms)
+          (slideInHorizontally(animationSpec = tween(180)) { fullWidth -> -fullWidth / 4 } +
+           fadeIn(animationSpec = tween(180)))
+            .togetherWith(
+              slideOutHorizontally(animationSpec = tween(160)) { fullWidth -> fullWidth / 4 } +
+              fadeOut(animationSpec = tween(160))
+            )
+        }
+      },
       label = "ScreenTransition"
     ) { isEditing ->
       if (isEditing) {
@@ -106,6 +146,22 @@ fun VaultNotesApp(viewModel: NotesViewModel) {
             onModeChange = viewModel::setEditorMode,
             onNoteFontChange = viewModel::updateActiveNoteFontTheme,
             onDeleteNote = viewModel::deleteActiveNote,
+            onExportMarkdown = { uri ->
+              val success = viewModel.exportNoteToMarkdown(context, uri, currentActiveNote)
+              Toast.makeText(
+                context,
+                if (success) context.getString(R.string.export_success) else context.getString(R.string.export_error),
+                Toast.LENGTH_SHORT
+              ).show()
+            },
+            onExportVaultZip = { uri ->
+              val success = viewModel.exportNoteToVaultZip(context, uri, currentActiveNote)
+              Toast.makeText(
+                context,
+                if (success) context.getString(R.string.export_success) else context.getString(R.string.export_error),
+                Toast.LENGTH_SHORT
+              ).show()
+            },
             onBackClick = viewModel::closeActiveNote
           )
         }
@@ -122,9 +178,32 @@ fun VaultNotesApp(viewModel: NotesViewModel) {
           onNoteClick = viewModel::openNote,
           onCreateNoteClick = viewModel::createNewNote,
           onDeleteNote = viewModel::deleteNote,
-          onOpenDebugDashboard = { showDebugDashboard = true }
+          onOpenDebugDashboard = { showDebugDashboard = true },
+          onOpenSettings = { showSettingsDialog = true },
+          onImportNote = { uri ->
+            viewModel.importNoteFromUri(context, uri) { _, message ->
+              (context as? ComponentActivity)?.runOnUiThread {
+                Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+              }
+            }
+          }
         )
       }
+    }
+
+    // Diálogo de Ajustes de Apariencia (Modo Claro/Oscuro/Sistema, Material You, Colores de Énfasis y Tipografía)
+    if (showSettingsDialog) {
+      SettingsDialog(
+        themeMode = themeMode,
+        dynamicColor = dynamicColor,
+        accentPalette = accentPalette,
+        fontTheme = selectedFont,
+        onThemeModeChange = viewModel::setThemeMode,
+        onDynamicColorChange = viewModel::setDynamicColor,
+        onAccentPaletteChange = viewModel::setAccentPalette,
+        onFontThemeChange = viewModel::setFontTheme,
+        onDismiss = { showSettingsDialog = false }
+      )
     }
 
     // HUD flotante de rendimiento en pantalla (FPS, RAM JVM y RAM Nativa de Rust/C++, Hilos)

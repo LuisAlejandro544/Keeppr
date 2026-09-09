@@ -2,14 +2,18 @@ package com.example.ui.viewmodel
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.data.model.Note
 import com.example.data.repository.NoteRepository
+import com.example.data.util.VaultPackageHelper
 import com.example.native.NativeEngine
 import com.example.ui.markdown.MarkdownParser
+import com.example.ui.theme.AppAccentPalette
 import com.example.ui.theme.AppFontTheme
+import com.example.ui.theme.AppThemeMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -41,6 +45,24 @@ class NotesViewModel(
     )
     val selectedFont: StateFlow<AppFontTheme> = _selectedFont.asStateFlow()
 
+    // Estado reactivo para el modo de tema (Sistema, Claro, Oscuro)
+    private val _themeMode = MutableStateFlow(
+        AppThemeMode.fromId(prefs?.getString("selected_theme_mode", AppThemeMode.SYSTEM.id))
+    )
+    val themeMode: StateFlow<AppThemeMode> = _themeMode.asStateFlow()
+
+    // Estado reactivo para Material You (activado por defecto)
+    private val _dynamicColor = MutableStateFlow(
+        prefs?.getBoolean("use_dynamic_color", true) ?: true
+    )
+    val dynamicColor: StateFlow<Boolean> = _dynamicColor.asStateFlow()
+
+    // Estado reactivo para la paleta de acento (cuando dynamicColor está desactivado)
+    private val _accentPalette = MutableStateFlow(
+        AppAccentPalette.fromId(prefs?.getString("selected_accent_palette", AppAccentPalette.PURPLE.id))
+    )
+    val accentPalette: StateFlow<AppAccentPalette> = _accentPalette.asStateFlow()
+
     /**
      * Actualiza la tipografía activa de la aplicación y la almacena de forma persistente
      * en SharedPreferences para que sobreviva a reinicios sin requerir internet.
@@ -48,6 +70,30 @@ class NotesViewModel(
     fun setFontTheme(fontTheme: AppFontTheme) {
         _selectedFont.value = fontTheme
         prefs?.edit()?.putString("selected_font_theme", fontTheme.id)?.apply()
+    }
+
+    /**
+     * Actualiza el modo de tema visual (Sistema, Claro u Oscuro).
+     */
+    fun setThemeMode(mode: AppThemeMode) {
+        _themeMode.value = mode
+        prefs?.edit()?.putString("selected_theme_mode", mode.id)?.apply()
+    }
+
+    /**
+     * Activa o desactiva la extracción de colores de Material You.
+     */
+    fun setDynamicColor(enabled: Boolean) {
+        _dynamicColor.value = enabled
+        prefs?.edit()?.putBoolean("use_dynamic_color", enabled)?.apply()
+    }
+
+    /**
+     * Selecciona la paleta de acento cuando no se usa Material You.
+     */
+    fun setAccentPalette(palette: AppAccentPalette) {
+        _accentPalette.value = palette
+        prefs?.edit()?.putString("selected_accent_palette", palette.id)?.apply()
     }
 
     private var saveJob: Job? = null
@@ -221,14 +267,20 @@ class NotesViewModel(
         }
     }
 
+    /**
+     * Cierra la nota activa de forma completamente no bloqueante.
+     * Cancela tareas diferidas pendientes y persiste en Dispatchers.IO liberando
+     * el estado activo al instante para que la animación de regreso comience en el frame 0.
+     */
     fun closeActiveNote() {
-        _activeNote.value?.let { current ->
+        val current = _activeNote.value
+        _activeNote.value = null
+        if (current != null) {
             saveJob?.cancel()
             viewModelScope.launch(Dispatchers.IO) {
                 repository.update(current)
             }
         }
-        _activeNote.value = null
     }
 
     private fun saveNoteAsync(note: Note, debounce: Boolean = true) {
@@ -243,6 +295,38 @@ class NotesViewModel(
                 repository.update(note)
             }
         }
+    }
+
+    /**
+     * Importa una nota a partir de un archivo .md, .txt o paquete .zip de VaultNotes.
+     * La verificación criptográfica se realiza de forma transparente en el motor Rust.
+     */
+    fun importNoteFromUri(context: Context, uri: Uri, onResult: (Boolean, String) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            when (val result = VaultPackageHelper.importFromUri(context, uri)) {
+                is VaultPackageHelper.ImportResult.Success -> {
+                    val newId = repository.insert(result.note)
+                    onResult(true, result.message)
+                }
+                is VaultPackageHelper.ImportResult.Error -> {
+                    onResult(false, result.error)
+                }
+            }
+        }
+    }
+
+    /**
+     * Exporta una nota a formato Markdown plano (.md) universal.
+     */
+    fun exportNoteToMarkdown(context: Context, uri: Uri, note: Note): Boolean {
+        return VaultPackageHelper.exportMarkdown(context, uri, note)
+    }
+
+    /**
+     * Exporta una nota a un paquete seguro .zip firmado con SHA-256 en Rust.
+     */
+    fun exportNoteToVaultZip(context: Context, uri: Uri, note: Note): Boolean {
+        return VaultPackageHelper.exportVaultZip(context, uri, note)
     }
 
     class Factory(

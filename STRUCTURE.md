@@ -45,7 +45,8 @@ Este documento detalla el árbol de directorios, la organización de módulos y 
 │       │   │   │   ├── components/
 │       │   │   │   │   ├── EmojiPickerDialog.kt    # Selector de iconos/emojis para notas
 │       │   │   │   │   ├── MarkdownToolbar.kt      # Barra de herramientas Markdown móvil (con botón 'Aa Fuente')
-│       │   │   │   │   └── FontSelectionDialog.kt  # Selector de tipografías con alcance dual (toda la nota vs selección)
+│       │   │   │   │   ├── FontSelectionDialog.kt  # Selector de tipografías con alcance dual (toda la nota vs selección)
+│       │   │   │   │   └── SettingsDialog.kt       # Diálogo modal de Ajustes: Modo Claro/Oscuro/Sistema, Material You, Acentos y Fuentes
 │       │   │   │   ├── debug/                 # Componentes Visuales de Depuración y Rendimiento
 │       │   │   │   │   ├── PerformanceFloatingHud.kt # HUD / Overlay flotante arrastrable sobre toda la app
 │       │   │   │   │   └── DebugDashboardDialog.kt   # Diálogo / Dashboard completo con pestañas de Rendimiento, Hilos, Logs y Sistema
@@ -55,12 +56,13 @@ Este documento detalla el árbol de directorios, la organización de módulos y 
 │       │   │   │   ├── navigation/
 │       │   │   │   │   └── AppNavigation.kt # Grafo de navegación y rutas de pantalla
 │       │   │   │   ├── screens/
-│       │   │   │   │   ├── NotesListScreen.kt  # Pantalla principal: lista (tarjetas con fuente y eliminación con confirmación), búsqueda y motor
+│       │   │   │   │   ├── NotesListScreen.kt  # Pantalla principal: lista (tarjetas con fuente y eliminación con confirmación), búsqueda, ajustes y motor
 │       │   │   │   │   └── NoteEditorScreen.kt # Editor con soporte de tipografía por nota, etiquetas de fragmento y eliminación con confirmación
 │       │   │   │   ├── theme/
 │       │   │   │   │   ├── Color.kt, Theme.kt, Type.kt # Paleta M3 y definiciones de AppFontTheme (5 familias de fuentes)
+│       │   │   │   │   └── ThemePreferences.kt # Modelos para AppThemeMode (Sistema/Claro/Oscuro) y AppAccentPalette (paletas de acento)
 │       │   │   │   └── viewmodel/
-│       │   │   │       └── NotesViewModel.kt   # ViewModel para gestión reactiva de notas y tipografía por nota
+│       │   │   │       └── NotesViewModel.kt   # ViewModel para gestión reactiva de notas, tipografía y preferencias de tema visual
 │       │   └── res/                       # Recursos Android
 │       │       ├── values/                # strings.xml, colors.xml, themes.xml
 │       │       ├── mipmap-*/              # Iconos adaptativos de la aplicación
@@ -94,11 +96,12 @@ Este documento detalla el árbol de directorios, la organización de módulos y 
 ### 2. Capa de Datos (`app/src/main/java/com/example/data`)
 - **Room Database**: Utiliza SQLite embebido sin dependencias en la nube.
 - **DAO & Entidades**: Diseñadas para operaciones transaccionales rápidas mediante Kotlin Coroutines (`suspend`) y observación en tiempo real con `Flow`.
+- **`VaultPackageHelper`**: Motor de serialización, empaquetado y desempaquetado de notas. Procesa la exportación e importación dual (Markdown plano `.md` y paquetes comprimidos `.zip` que integran `note.md`, metadatos en `vault_meta.json` y firma de autenticidad criptográfica `signature.vault` verificada mediante SHA-256 nativo).
 
 ### 3. Capa de Presentación (`app/src/main/java/com/example/ui`)
-- **Jetpack Compose + Material 3**: UI declarativa, soporte para modo oscuro/claro, animaciones fluidas y accesibilidad táctil con áreas mínimas de 48dp.
-- **Sistema Tipográfico Granular**: 5 familias de fuentes nativas seleccionables de forma individual por nota o por fragmento de texto (`[font:id]...[/font]`) sin alterar la aplicación globalmente, con persistencia en base de datos Room.
-- **`NotesViewModel`**: Maneja el estado de la UI (`StateFlow`) desacoplado del ciclo de vida de la actividad.
+- **Jetpack Compose + Material 3**: UI declarativa, soporte completo para modo oscuro, claro y seguimiento del sistema, integración dinámica con Material You en Android 12+, paletas de acento personalizadas (Obsidian, Esmeralda, Ámbar, Azul Zafiro, Rosa Neón), animaciones fluidas y accesibilidad táctil con áreas mínimas de 48dp.
+- **Sistema Tipográfico Granular**: 5 familias de fuentes nativas seleccionables de forma individual por nota o por fragmento de texto (`[font:id]...[/font]`) y configuración de tipografía global predeterminada desde el diálogo de ajustes, con persistencia en base de datos Room y SharedPreferences.
+- **`NotesViewModel`**: Maneja el estado de la UI (`StateFlow`) desacoplado del ciclo de vida de la actividad, persistiendo en tiempo real temas visuales, modo de vista y consultas.
 
 ### 4. Capa de Diagnóstico y Depuración en Tiempo Real (`app/src/main/java/com/example/debug` y `ui/debug`)
 - **`PerformanceMonitor`**: Muestrea FPS mediante `Choreographer`, calcula memoria JVM libre/usada y rastrea el uso de memoria nativa C++/Rust mediante `Debug.getNativeHeapAllocatedSize()`.

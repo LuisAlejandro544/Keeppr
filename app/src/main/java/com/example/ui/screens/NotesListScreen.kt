@@ -1,6 +1,12 @@
 package com.example.ui.screens
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -8,6 +14,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,7 +40,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ViewAgenda
@@ -64,7 +74,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -97,10 +110,18 @@ fun NotesListScreen(
     onCreateNoteClick: () -> Unit,
     onDeleteNote: (Note) -> Unit,
     onOpenDebugDashboard: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
+    onImportNote: (Uri) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var noteToDelete by remember { mutableStateOf<Note?>(null) }
     var showNativeEngineDialog by remember { mutableStateOf(false) }
+
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) onImportNote(uri)
+    }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -120,6 +141,30 @@ fun NotesListScreen(
                     }
                 },
                 actions = {
+                    IconButton(
+                        onClick = {
+                            importLauncher.launch(arrayOf("text/*", "application/zip", "application/octet-stream", "*/*"))
+                        },
+                        modifier = Modifier.testTag("import_note_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.FileOpen,
+                            contentDescription = stringResource(R.string.import_note),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    IconButton(
+                        onClick = onOpenSettings,
+                        modifier = Modifier.testTag("settings_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Palette,
+                            contentDescription = stringResource(R.string.settings_title),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
                     IconButton(
                         onClick = onOpenDebugDashboard,
                         modifier = Modifier.testTag("debug_dashboard_button")
@@ -283,8 +328,12 @@ fun NotesListScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     if (pinnedNotes.isNotEmpty()) {
-                        item {
-                            SectionHeader(title = "Fijadas 📌", count = pinnedNotes.size)
+                        item(key = "header_pinned") {
+                            SectionHeader(
+                                title = "Fijadas 📌",
+                                count = pinnedNotes.size,
+                                modifier = Modifier.animateItem()
+                            )
                         }
                         items(pinnedNotes, key = { it.id }) { note ->
                             NoteCard(
@@ -292,15 +341,20 @@ fun NotesListScreen(
                                 isCompact = isCompactView,
                                 onClick = { onNoteClick(note) },
                                 onLongClick = { noteToDelete = note },
-                                onDeleteClick = { noteToDelete = note }
+                                onDeleteClick = { noteToDelete = note },
+                                modifier = Modifier.animateItem()
                             )
                         }
                     }
 
                     if (regularNotes.isNotEmpty()) {
                         if (pinnedNotes.isNotEmpty()) {
-                            item {
-                                SectionHeader(title = "Otras Notas", count = regularNotes.size)
+                            item(key = "header_regular") {
+                                SectionHeader(
+                                    title = "Otras Notas",
+                                    count = regularNotes.size,
+                                    modifier = Modifier.animateItem()
+                                )
                             }
                         }
                         items(regularNotes, key = { it.id }) { note ->
@@ -309,7 +363,8 @@ fun NotesListScreen(
                                 isCompact = isCompactView,
                                 onClick = { onNoteClick(note) },
                                 onLongClick = { noteToDelete = note },
-                                onDeleteClick = { noteToDelete = note }
+                                onDeleteClick = { noteToDelete = note },
+                                modifier = Modifier.animateItem()
                             )
                         }
                     }
@@ -473,9 +528,13 @@ fun NotesListScreen(
 }
 
 @Composable
-private fun SectionHeader(title: String, count: Int) {
+private fun SectionHeader(
+    title: String,
+    count: Int,
+    modifier: Modifier = Modifier
+) {
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -511,7 +570,8 @@ private fun NoteCard(
     isCompact: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
-    onDeleteClick: () -> Unit
+    onDeleteClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val formattedDate = remember(note.updatedAt) {
         val sdf = SimpleDateFormat("d MMM, HH:mm", Locale.getDefault())
@@ -527,11 +587,36 @@ private fun NoteCard(
     }
     val cleanSnippet = noteSummary.snippet
 
+    // Microinteracción táctil: respuesta elástica (Spring Scale) con MutableInteractionSource
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val cardScale by animateFloatAsState(
+        targetValue = if (isPressed) 0.965f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "note_card_press_scale"
+    )
+
+    // Animación sutil de rotación y presencia del pin
+    val pinAngle by animateFloatAsState(
+        targetValue = if (note.isPinned) 0f else -30f,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "pin_rotation"
+    )
+
     ElevatedCard(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = cardScale
+                scaleY = cardScale
+            }
             .clip(RoundedCornerShape(14.dp))
             .combinedClickable(
+                interactionSource = interactionSource,
+                indication = null,
                 onClick = onClick,
                 onLongClick = onLongClick
             )
@@ -540,7 +625,9 @@ private fun NoteCard(
         colors = CardDefaults.elevatedCardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.5.dp)
+        elevation = CardDefaults.elevatedCardElevation(
+            defaultElevation = if (isPressed) 4.dp else 1.5.dp
+        )
     ) {
         Column(
             modifier = Modifier
@@ -577,6 +664,7 @@ private fun NoteCard(
                         modifier = Modifier
                             .padding(end = 4.dp)
                             .size(16.dp)
+                            .rotate(pinAngle)
                     )
                 }
 

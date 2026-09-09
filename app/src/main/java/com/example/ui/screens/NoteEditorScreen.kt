@@ -1,6 +1,9 @@
 package com.example.ui.screens
 
+import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -36,6 +39,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Label
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Visibility
@@ -72,6 +76,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
@@ -109,6 +115,8 @@ fun NoteEditorScreen(
     onModeChange: (EditorMode) -> Unit,
     onNoteFontChange: (String) -> Unit = {},
     onDeleteNote: () -> Unit,
+    onExportMarkdown: (Uri) -> Unit = {},
+    onExportVaultZip: (Uri) -> Unit = {},
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -117,15 +125,37 @@ fun NoteEditorScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showTagsEditor by remember { mutableStateOf(false) }
     var showFontDialog by remember { mutableStateOf(false) }
+    var showExportDialog by remember { mutableStateOf(false) }
+
+    val exportMarkdownLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/markdown")
+    ) { uri ->
+        if (uri != null) onExportMarkdown(uri)
+    }
+
+    val exportVaultZipLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/zip")
+    ) { uri ->
+        if (uri != null) onExportVaultZip(uri)
+    }
 
     var isContentFocused by remember { mutableStateOf(false) }
     val isImeVisible = WindowInsets.isImeVisible
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
     val coroutineScope = rememberCoroutineScope()
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    // Cierre inmediato y fluido: oculta el teclado virtual y libera el foco antes de disparar la transición
+    val handleExit = {
+        keyboardController?.hide()
+        focusManager.clearFocus(force = true)
+        onBackClick()
+    }
 
     // Intercept hardware or gesture back button to close active note gracefully
     BackHandler {
-        onBackClick()
+        handleExit()
     }
 
     // Keep track of text field value with cursor selection for toolbar insertions
@@ -160,7 +190,7 @@ fun NoteEditorScreen(
             TopAppBar(
                 navigationIcon = {
                     IconButton(
-                        onClick = onBackClick,
+                        onClick = handleExit,
                         modifier = Modifier.testTag("editor_back_button")
                     ) {
                         Icon(
@@ -230,6 +260,17 @@ fun NoteEditorScreen(
                             imageVector = Icons.Default.FormatSize,
                             contentDescription = stringResource(R.string.select_typography),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    IconButton(
+                        onClick = { showExportDialog = true },
+                        modifier = Modifier.testTag("export_note_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.FileDownload,
+                            contentDescription = stringResource(R.string.export_note),
+                            tint = MaterialTheme.colorScheme.primary
                         )
                     }
 
@@ -591,6 +632,99 @@ fun NoteEditorScreen(
                 }
             },
             onDismissRequest = { showFontDialog = false }
+        )
+    }
+
+    if (showExportDialog) {
+        AlertDialog(
+            onDismissRequest = { showExportDialog = false },
+            title = {
+                Text(
+                    text = stringResource(R.string.export_note),
+                    style = MaterialTheme.typography.titleLarge
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Opción 1: Markdown (.md)
+                    Surface(
+                        onClick = {
+                            showExportDialog = false
+                            val cleanName = note.title.ifBlank { "nota" }
+                                .replace("[^a-zA-Z0-9_\\-]".toRegex(), "_")
+                            exportMarkdownLauncher.launch("$cleanName.md")
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("export_option_markdown")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(text = "📄", fontSize = 24.sp, modifier = Modifier.padding(end = 12.dp))
+                            Column {
+                                Text(
+                                    text = stringResource(R.string.export_as_markdown),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = stringResource(R.string.export_as_markdown_desc),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    // Opción 2: Paquete Vault ZIP firmado
+                    Surface(
+                        onClick = {
+                            showExportDialog = false
+                            val cleanName = note.title.ifBlank { "nota" }
+                                .replace("[^a-zA-Z0-9_\\-]".toRegex(), "_")
+                            exportVaultZipLauncher.launch("${cleanName}_vault.zip")
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("export_option_vault_zip")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(text = "🛡️", fontSize = 24.sp, modifier = Modifier.padding(end = 12.dp))
+                            Column {
+                                Text(
+                                    text = stringResource(R.string.export_as_vault_zip),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = stringResource(R.string.export_as_vault_zip_desc),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showExportDialog = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
         )
     }
 }

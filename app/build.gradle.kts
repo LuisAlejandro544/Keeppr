@@ -190,16 +190,20 @@ val cargoBuild = tasks.register("cargoBuild") {
           targetReleaseDir.mkdirs()
           val libFile = targetReleaseDir.resolve("libvaultnotes_rust.a")
           if (!libFile.exists()) {
-            // Generar un archivo .a vacío válido con llvm-ar si no existe
-            val dummyC = File(targetReleaseDir, "dummy.c")
-            dummyC.writeText("void dummy_rust_sym() {}")
+            val shimC = rustDir.resolve("rust_shim.c")
             val clangBin = File(llvmBin, targetInfo.second).absolutePath
-            val compilePb = ProcessBuilder(clangBin, "-c", dummyC.absolutePath, "-o", File(targetReleaseDir, "dummy.o").absolutePath)
+            val compilePb = ProcessBuilder(clangBin, "-O2", "-fPIC", "-c", shimC.absolutePath, "-o", File(targetReleaseDir, "shim.o").absolutePath)
             compilePb.inheritIO()
-            compilePb.start().waitFor()
-            val arPb = ProcessBuilder(arBin, "rcs", libFile.absolutePath, File(targetReleaseDir, "dummy.o").absolutePath)
+            val compileExit = compilePb.start().waitFor()
+            if (compileExit != 0) {
+              throw GradleException("Failed to compile native shim for $rustTarget with code $compileExit")
+            }
+            val arPb = ProcessBuilder(arBin, "rcs", libFile.absolutePath, File(targetReleaseDir, "shim.o").absolutePath)
             arPb.inheritIO()
-            arPb.start().waitFor()
+            val arExit = arPb.start().waitFor()
+            if (arExit != 0) {
+              throw GradleException("Failed to archive native shim for $rustTarget with code $arExit")
+            }
           }
         }
       }

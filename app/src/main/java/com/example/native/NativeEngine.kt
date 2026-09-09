@@ -19,6 +19,13 @@ object NativeEngine {
     val isAvailable: Boolean
         get() = isLoaded
 
+    // Expresiones regulares precompiladas para evitar sobrecarga en el Garbage Collector de la JVM
+    private val FONT_TAG_REGEX = Regex("\\[/?font(:[^\\]]+)?\\]")
+    private val WHITESPACE_REGEX = Regex("\\s+")
+
+    // Caché LRU de resúmenes de notas en memoria para evitar llamadas JNI repetidas durante el renderizado de listas
+    private val summaryCache = android.util.LruCache<Int, NoteSummary>(200)
+
     fun getEngineInfo(): String {
         return if (isLoaded) {
             try {
@@ -63,29 +70,35 @@ object NativeEngine {
      * extracto limpio (snippet) de Markdown sin asignar objetos pesados en el Garbage Collector de la JVM.
      */
     fun processNoteSummary(content: String, maxSnippetLen: Int = 120): NoteSummary {
-        if (!isLoaded) {
-            val words = if (content.isBlank()) 0 else content.trim().split(Regex("\\s+")).size
-            val readingTime = (words / 3.3).toInt()
-            val snippet = content.lines().filter { it.isNotBlank() && !it.startsWith("#") }.joinToString(" ").take(maxSnippetLen)
-            return NoteSummary(words, readingTime, snippet)
-        }
+        val cacheKey = 31 * content.hashCode() + maxSnippetLen
+        summaryCache.get(cacheKey)?.let { return it }
 
-        return try {
-            val raw = processNoteSummaryInRust(content, maxSnippetLen)
-            val parts = raw.split("|", limit = 3)
-            val words = parts.getOrNull(0)?.toIntOrNull() ?: 0
-            val readingTime = parts.getOrNull(1)?.toIntOrNull() ?: 0
-            val snippet = parts.getOrNull(2) ?: ""
-            val cleanedSnippet = snippet.replace(Regex("\\[/?font(:[^\\]]+)?\\]"), "")
-            NoteSummary(words, readingTime, cleanedSnippet)
-        } catch (e: Throwable) {
-            Log.e(TAG, "Error procesando resumen en Rust", e)
-            val words = if (content.isBlank()) 0 else content.trim().split(Regex("\\s+")).size
+        val summary = if (!isLoaded) {
+            val words = if (content.isBlank()) 0 else content.trim().split(WHITESPACE_REGEX).size
             val readingTime = (words / 3.3).toInt()
             val snippet = content.lines().filter { it.isNotBlank() && !it.startsWith("#") }.joinToString(" ").take(maxSnippetLen)
-            val cleanedSnippet = snippet.replace(Regex("\\[/?font(:[^\\]]+)?\\]"), "")
+            val cleanedSnippet = snippet.replace(FONT_TAG_REGEX, "")
             NoteSummary(words, readingTime, cleanedSnippet)
+        } else {
+            try {
+                val raw = processNoteSummaryInRust(content, maxSnippetLen)
+                val parts = raw.split("|", limit = 3)
+                val words = parts.getOrNull(0)?.toIntOrNull() ?: 0
+                val readingTime = parts.getOrNull(1)?.toIntOrNull() ?: 0
+                val snippet = parts.getOrNull(2) ?: ""
+                val cleanedSnippet = snippet.replace(FONT_TAG_REGEX, "")
+                NoteSummary(words, readingTime, cleanedSnippet)
+            } catch (e: Throwable) {
+                Log.e(TAG, "Error procesando resumen en Rust", e)
+                val words = if (content.isBlank()) 0 else content.trim().split(WHITESPACE_REGEX).size
+                val readingTime = (words / 3.3).toInt()
+                val snippet = content.lines().filter { it.isNotBlank() && !it.startsWith("#") }.joinToString(" ").take(maxSnippetLen)
+                val cleanedSnippet = snippet.replace(FONT_TAG_REGEX, "")
+                NoteSummary(words, readingTime, cleanedSnippet)
+            }
         }
+        summaryCache.put(cacheKey, summary)
+        return summary
     }
 
     /**
@@ -106,11 +119,48 @@ object NativeEngine {
         }
     }
 
+    /**
+     * Genera una firma criptográfica nativa en Rust con SHA-256 autenticado
+     * para empaquetar notas en archivos .zip de VaultNotes.
+     */
+    fun generateVaultSignature(data: ByteArray): String {
+        return if (isLoaded) {
+            try {
+                generateVaultSignatureInRust(data)
+            } catch (e: Throwable) {
+                Log.e(TAG, "Error generando firma de bóveda en Rust", e)
+                ""
+            }
+        } else {
+            ""
+        }
+    }
+
+    /**
+     * Verifica en tiempo constante mediante Rust si una firma criptográfica
+     * coincide exactamente con los datos del paquete de la bóveda.
+     */
+    fun verifyVaultSignature(data: ByteArray, signature: String): Boolean {
+        if (signature.isBlank()) return false
+        return if (isLoaded) {
+            try {
+                verifyVaultSignatureInRust(data, signature)
+            } catch (e: Throwable) {
+                Log.e(TAG, "Error verificando firma de bóveda en Rust", e)
+                false
+            }
+        } else {
+            false
+        }
+    }
+
     private external fun getNativeInfo(): String
     private external fun executeLua(script: String): String
     private external fun calculateReadingTimeInRust(wordCount: Int): Int
     private external fun processNoteSummaryInRust(content: String, maxSnippetLen: Int): String
     private external fun matchNoteInRust(query: String, title: String, content: String, tags: String): Boolean
+    private external fun generateVaultSignatureInRust(data: ByteArray): String
+    private external fun verifyVaultSignatureInRust(data: ByteArray, signature: String): Boolean
 }
 
 /**

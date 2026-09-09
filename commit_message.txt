@@ -1,19 +1,65 @@
-feat(ui): restringir selector de fuentes al editor y permitir tipografías por nota y fragmentos
+feat(export-import): agregar importación y exportación universal en Markdown (.md) y paquetes de bóveda (.zip) firmados con SHA-256 nativo
 
-- Eliminado el botón y diálogo de selección de tipografía de la pantalla principal (NotesListScreen): el menú ya no es accesible desde el selector de notas general y queda restringido exclusivamente al interior del editor de notas.
-- Implementado sistema de tipografía granular y fragmentaria en lugar de ajuste global:
-  * Alcance "Toda la nota": permite definir la tipografía base de la nota activa (almacenada individualmente en Room y reflejada en sus tarjetas).
-  * Alcance "Texto seleccionado": permite envolver fragmentos de texto con etiquetas de formato `[font:id]...[/font]` o insertarlas en la posición del cursor para combinar múltiples familias tipográficas dentro de una misma nota.
-  * Agregado botón de acceso rápido "Aa Fuente" en la barra de herramientas móvil de Markdown (MarkdownToolbar).
-  * Renderizador interactivo en tiempo real (MarkdownPreview) con soporte para familias de fuentes de Android (Predeterminada, Sans-Serif, Serif, Monoespaciada y Cursiva).
-- Actualizada la base de datos Room a versión 2 (MIGRATION_1_2) para persistir el campo `fontTheme` en cada nota sin alterar la configuración del sistema.
-- Incorporada opción para eliminar notas de forma segura con diálogo de confirmación:
-  * Acción de eliminación disponible tanto desde el interior del editor de notas (NoteEditorScreen) como directamente desde cada tarjeta en la lista principal (NotesListScreen) mediante botón dedicado y pulsación prolongada (long-click).
-  * Diálogo modal de confirmación con icono de advertencia, indicación explícita del título de la nota a eliminar y confirmación destructiva para evitar borrados accidentales en pantallas táctiles móviles.
-- Integrada suite completa de diagnóstico, telemetría y depuración en vivo en el dispositivo móvil:
-  * Incorporada dependencia oficial de LeakCanary (v2.14) en Gradle para la detección automática y reporte en tiempo real de fugas de memoria (Memory Leaks).
-  * Creado monitor de rendimiento en segundo plano (PerformanceMonitor) que calcula FPS continuos mediante Choreographer, monitorea la memoria JVM usada vs. máxima, mide el tamaño asignado en el Heap Nativo de C++/Rust y audita los hilos activos del proceso.
-  * Creado colector de registros en tiempo real (InAppLogCollector) que captura la salida de Logcat del proceso para inspección sin cables ni PC.
-  * Diseñado e integrado widget flotante interactivo (PerformanceFloatingHud) arrastrable sobre toda la interfaz con métricas en vivo (FPS, RAM JVM/Nativa e hilos) y selector de visibilidad.
-  * Diseñado panel de control completo (DebugDashboardDialog) con 4 pestañas interactivas: métricas de rendimiento con disparador de Garbage Collector (GC), explorador de hilos activos con estados y prioridades, visor de logs en tiempo real con filtros por severidad y búsqueda, e información de hardware, arquitecturas ABI y estado de enlace con los motores de C++, Lua y Rust.
-  * Agregado botón de acceso directo al panel de depuración en la barra superior de la pantalla principal (NotesListScreen).
+- Exportación dual de notas en NoteEditorScreen.kt:
+  * Exportación a Markdown plano universal (.md) compatible con Obsidian, Notion y editores externos mediante Storage Access Framework (SAF).
+  * Exportación a Paquetes de Bóveda (.zip) con estructura completa: note.md, vault_meta.json (metadatos, icono, etiquetas, tipografía) y signature.vault.
+- Firma criptográfica nativa de integridad (SHA-256):
+  * Implementación nativa de alta velocidad en C++ (native-bridge.cpp) y Rust (lib.rs) con SHA-256 y salt de autenticidad para computar firmas de paquetes.
+  * Verificación en tiempo constante (constant-time compare) para mitigar ataques de temporización (timing attacks).
+  * Puente JNI en NativeEngine.kt para generación y validación transparente de firmas criptográficas.
+- Importación universal con validación automática (VaultPackageHelper.kt):
+  * Soporte para importar archivos .md, .txt y paquetes .zip directamente desde NotesListScreen.kt.
+  * Reconocimiento automático de firmas auténticas de VaultNotes, restaurando metadatos completos y tipografías personalizadas.
+  * Extracción tolerante a fallos para archivos ZIP estándar o no firmados.
+- Notificaciones de resultado táctiles y no bloqueantes en MainActivity.kt y cadenas i18n en strings.xml.
+
+---
+
+feat(ui-animations): agregar animaciones fluidas de lista, microinteracciones táctiles y transiciones en tareas Markdown
+
+- Reordenamiento y filtrado animado en LazyColumn (NotesListScreen.kt):
+  * Integrado Modifier.animateItem() en todos los elementos de notas fijadas, notas regulares y encabezados de sección.
+  * Transición fluida de recolocación a 60/120 FPS al filtrar por búsqueda de texto o chips de etiqueta #tag, y al fijar/desfijar notas.
+- Microinteracciones táctiles elásticas en tarjetas de notas (NoteCard):
+  * Detección de pulsación táctil con MutableInteractionSource y collectIsPressedAsState().
+  * Efecto de presión y rebote elástico (Spring Scale) usando animateFloatAsState con dampingRatio = Spring.DampingRatioMediumBouncy (escalado sutil de 1.0 a 0.965).
+  * Rotación y presencia animada del icono de chincheta/pin (PushPin) al alternar su estado de fijado mediante rotate(pinAngle).
+- Animación interactiva en checkboxes y tareas Markdown (MarkdownRenderer.kt):
+  * Microanimación de rebote al pulsar cada casilla de verificación de tarea [ ] / [x] con animateFloatAsState (escala reactiva a 1.08).
+  * Transición suave de color y opacidad en el texto completado (animateColorAsState y animateFloatAsState con alpha a 0.65) acompañando el tachado de línea.
+
+---
+
+feat(settings): agregar diálogo de ajustes con soporte para modo claro, oscuro, Material You y paletas de acento
+
+- Ajustes visuales y temas dinámicos en Jetpack Compose (Theme.kt y ThemePreferences.kt):
+  * Soporte completo para 3 modos de visualización: Sistema (isSystemInDarkTheme), Claro y Oscuro.
+  * Compatibilidad con Material You dinámico (dynamicDarkColorScheme / dynamicLightColorScheme) en Android 12+ (API 31+).
+  * Paletas de acento personalizadas (Obsidian Púrpura, Esmeralda Cripto, Ámbar Cálido, Azul Zafiro y Rosa Neón) cuando Material You está desactivado o en Android 8 a 11 (API 26-30).
+- Diálogo modal interactivo de ajustes (SettingsDialog.kt):
+  * Selector de tarjetas táctiles para modo de tema (Sistema, Claro, Oscuro) con áreas mínimas de 48dp.
+  * Interruptor (Switch) para habilitar o deshabilitar Material You dinámico con validación de versión de Android.
+  * Selector mediante FilterChip para paletas de color de acento y tipografía global de la aplicación.
+  * Accesible directamente desde la barra superior de la pantalla principal (NotesListScreen.kt) mediante un icono de paleta.
+- Persistencia reactiva y desacoplada en NotesViewModel.kt y MainActivity.kt:
+  * Almacenamiento local e inmediato de preferencias (selected_theme_mode, use_dynamic_color, selected_accent_palette) mediante SharedPreferences.
+  * Flujos reactivos de StateFlow conectados a MyApplicationTheme en MainActivity para actualizar la UI en vivo sin parpadeos ni reinicios de actividad.
+- Actualización de documentación técnica (README.md, ROADMAP.md, STRUCTURE.md, AI_CONTEXT.md) reflejando la nueva capacidad sin alterar el pipeline nativo.
+
+---
+
+perf(navigation): optimizar transición de salida del editor y desacoplar renderizado de notas con corrutinas y caché JNI
+
+- Desacople y ejecución no bloqueante de corrutinas en el ViewModel (NotesViewModel.kt):
+  * En closeActiveNote(), se libera el estado activo (_activeNote.value = null) en el frame cero para disparar la animación de navegación al instante, sin esperar la escritura en SQLite.
+  * La sincronización con Room (repository.update) se despacha de forma completamente asíncrona en Dispatchers.IO tras cancelar cualquier tarea diferida (debounce) pendiente.
+- Liberación instantánea de teclado virtual (IME) y foco en NoteEditorScreen.kt:
+  * Integrados LocalFocusManager y LocalSoftwareKeyboardController para ocultar el teclado y limpiar el foco antes de disparar el evento de regreso.
+  * Unificado el manejador de salida tanto en el botón de la barra superior como en el botón/gesto de retroceso de Android (BackHandler), eliminando congelamientos causados por el desmonte de la sesión del teclado.
+- Aceleración y caché de renderizado en llamadas nativas (NativeEngine.kt):
+  * Implementada una caché LRU en memoria (LruCache<Int, NoteSummary>) para los resúmenes y métricas de notas procesados por el motor Rust.
+  * Precompiladas las expresiones regulares (FONT_TAG_REGEX y WHITESPACE_REGEX) a nivel estático para evitar sobrecargar el Garbage Collector (GC) de la JVM.
+  * Al volver a la lista principal, las tarjetas se dibujan de inmediato sin cruzar repetidamente el puente JNI por cada nota.
+- Transiciones direccionales fluidas a 60 FPS en MainActivity.kt:
+  * Reemplazado el desvanecimiento genérico por transiciones con deslizamiento horizontal direccional (slideInHorizontally / slideOutHorizontally) y curvas tween rápidas de 180 ms para una navegación instantánea y reactiva en pantallas táctiles móviles.
+

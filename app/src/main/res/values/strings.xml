@@ -24,5 +24,24 @@
     <string name="font_scope_whole_note">Toda la nota</string>
     <string name="font_scope_selection">Texto seleccionado</string>
     <string name="font_scope_desc">Define si deseas aplicar la tipografía a la nota completa o envolver la selección actual con etiquetas de estilo.</string>
+    <string name="settings_title">Ajustes</string>
+    <string name="theme_section">Apariencia y Tema</string>
+    <string name="theme_mode">Modo de Tema</string>
+    <string name="theme_mode_system">Seguir el Sistema</string>
+    <string name="theme_mode_light">Modo Claro</string>
+    <string name="theme_mode_dark">Modo Oscuro</string>
+    <string name="material_you">Material You (Color Dinámico)</string>
+    <string name="material_you_desc">Extrae los colores de tu fondo de pantalla (Android 12+)</string>
+    <string name="accent_color">Color de Énfasis</string>
+    <string name="accent_color_desc">Selecciona la paleta cuando Material You esté desactivado</string>
+    <string name="export_note">Exportar nota</string>
+    <string name="export_as_markdown">Exportar como Markdown (.md)</string>
+    <string name="export_as_markdown_desc">Texto estándar compatible con Obsidian, PC y editores externos</string>
+    <string name="export_as_vault_zip">Exportar Paquete Vault (.zip)</string>
+    <string name="export_as_vault_zip_desc">Paquete completo firmado con SHA-256 en Rust (preserva tipografía y metadatos)</string>
+    <string name="import_note">Importar nota</string>
+    <string name="import_note_desc">Selecciona un archivo .md, .txt o paquete .zip firmado de VaultNotes</string>
+    <string name="export_success">Nota exportada correctamente</string>
+    <string name="export_error">Error al exportar la nota</string>
     <string name="close">Cerrar</string>
 </resources>

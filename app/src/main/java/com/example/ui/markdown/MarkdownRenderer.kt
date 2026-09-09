@@ -5,6 +5,10 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -44,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
@@ -216,11 +221,40 @@ private fun RenderTaskItem(
     baseFontFamily: FontFamily,
     onToggle: (lineIndex: Int) -> Unit
 ) {
+    // Animación de escala sutil tipo rebote al alternar el estado del checkbox
+    val checkScale by animateFloatAsState(
+        targetValue = if (item.checked) 1.08f else 1.0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "task_checkbox_scale"
+    )
+
+    // Animación suave del color del texto
+    val textColor by animateColorAsState(
+        targetValue = if (item.checked) {
+            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+        } else {
+            MaterialTheme.colorScheme.onSurface
+        },
+        animationSpec = tween(durationMillis = 200),
+        label = "task_text_color"
+    )
+
+    // Animación suave de la opacidad del texto de tarea completada
+    val textAlpha by animateFloatAsState(
+        targetValue = if (item.checked) 0.65f else 1.0f,
+        animationSpec = tween(durationMillis = 200),
+        label = "task_text_alpha"
+    )
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
             .clickable { onToggle(item.lineIndex) }
-            .padding(vertical = 2.dp),
+            .padding(vertical = 4.dp, horizontal = 2.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Checkbox(
@@ -230,7 +264,12 @@ private fun RenderTaskItem(
                 checkedColor = MaterialTheme.colorScheme.primary,
                 uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant
             ),
-            modifier = Modifier.size(36.dp)
+            modifier = Modifier
+                .size(36.dp)
+                .graphicsLayer {
+                    scaleX = checkScale
+                    scaleY = checkScale
+                }
         )
         Spacer(modifier = Modifier.width(6.dp))
         Text(
@@ -238,12 +277,11 @@ private fun RenderTaskItem(
             style = MaterialTheme.typography.bodyMedium.copy(
                 fontFamily = baseFontFamily,
                 textDecoration = if (item.checked) TextDecoration.LineThrough else TextDecoration.None,
-                color = if (item.checked) {
-                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                } else {
-                    MaterialTheme.colorScheme.onSurface
-                }
-            )
+                color = textColor
+            ),
+            modifier = Modifier.graphicsLayer {
+                alpha = textAlpha
+            }
         )
     }
 }

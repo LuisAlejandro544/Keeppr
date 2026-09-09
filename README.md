@@ -74,10 +74,18 @@ gradle :app:testDebugUnitTest
    - 5 familias tipográficas nativas de Android: *Predeterminada (Sistema)*, *Sans-Serif Moderna*, *Serif Clásica (Editorial)*, *Monoespaciada (Código)* y *Cursiva Manuscrita*.
    - Persistencia 100% offline sin dependencias de red ni servicios externos.
 
-6. **Distribución Autónoma:**
+6. **Ajustes de Apariencia y Personalización de Tema:**
+   - Diálogo modal de ajustes dedicado (`SettingsDialog`) accesible mediante el botón de paleta en la barra superior.
+   - **Modo de Tema:** Selección entre *Seguir el Sistema*, *Modo Claro* forzado y *Modo Oscuro* forzado.
+   - **Material You (Color Dinámico):** Extracción nativa de la paleta de colores del fondo de pantalla del sistema en dispositivos Android 12+ (API 31+), con interruptor para activar/desactivar en vivo.
+   - **Paletas de Acento Personalizadas:** Cuando Material You está desactivado o en dispositivos Android 8 a 11 (API 26-30), permite elegir entre 5 paletas de color con acentos cuidadosamente calibrados: *Obsidian Púrpura*, *Esmeralda Cripto*, *Ámbar Cálido*, *Azul Zafiro* y *Rosa Neón*.
+   - **Tipografía Global:** Permite configurar la tipografía predeterminada de la interfaz completa junto al sistema granular de fuentes por nota.
+   - Persistencia local inmediata mediante `SharedPreferences` reactivas sincronizadas en el `NotesViewModel`.
+
+7. **Distribución Autónoma:**
    - Preparado para tiendas de aplicaciones de terceros (Uptodown, F-Droid, APK directo) cumpliendo con políticas de privacidad e integridad del sistema.
 
-7. **Suite de Diagnóstico y Depuración en Vivo (In-App Debug Suite):**
+8. **Suite de Diagnóstico y Depuración en Vivo (In-App Debug Suite):**
    - **LeakCanary (v2.14):** Detección automática y en tiempo real de fugas de memoria (Memory Leaks) en vistas, actividades y componentes en ejecución sin necesidad de PC.
    - **HUD / Overlay Flotante de Rendimiento:** Indicador superpuesto y arrastrable que muestra FPS en vivo (vía `Choreographer`), memoria JVM usada y máxima, memoria del Heap Nativo (C++/Rust) y número de hilos concurrentes.
    - **Dashboard / Panel de Control de Depuración:**
@@ -85,6 +93,18 @@ gradle :app:testDebugUnitTest
      * *Hilos Activos:* Inspección en tiempo real de cada hilo en ejecución (nombre, estado, prioridad y grupo).
      * *Visor de Logs del Proceso:* Lector integrado de Logcat con filtrado por nivel de severidad (Verbose a Error) y búsqueda de texto en vivo.
      * *Diagnóstico del Sistema & Nativos:* Inspección de hardware, ABI activa (`arm64-v8a`, `armeabi-v7a`, `x86_64`) y estado de los núcleos C++, Lua 5.4.6 y Rust.
+
+---
+
+9. **Importación y Exportación Universal (Markdown y Paquetes Vault con Firma Criptográfica):**
+    - **Exportación Dual desde el Editor:**
+      * *Markdown (.md):* Archivo de texto plano universal para llevar notas a Obsidian, Notion, Logseq, PC o editores externos sin bloqueos de plataforma.
+      * *Paquete Vault (.zip firmado):* Archivo comprimido autónomo que contiene el documento `note.md`, metadatos completos en `vault_meta.json` (título, etiquetas, icono, tipografía individual) y la firma de autenticidad `signature.vault`.
+    - **Firma Criptográfica Nativa (SHA-256):**
+      * Cómputo nativo con SHA-256 y salt de integridad en bajo nivel, garantizando verificación en tiempo constante contra manipulaciones externas.
+    - **Importación Flexible:**
+      * Importa archivos `.md`, `.txt` o paquetes `.zip` directamente desde el explorador de archivos del sistema mediante Storage Access Framework (SAF).
+      * Al importar un paquete de bóveda, valida automáticamente la firma nativa para garantizar la integridad y restaurar la tipografía y metadatos con total fidelidad.
 
 ---
 

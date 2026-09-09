@@ -54,27 +54,47 @@ private val LightColorScheme =
 /**
  * Tema principal de VaultNotes.
  *
- * Configura la paleta de colores M3 (con soporte dinámico en Android 12+),
- * una escala de fuentes fijada a 1.0f para prevenir desbordes en pantalla móvil,
- * y la tipografía activa elegida entre las 5 opciones nativas de Android.
+ * Configura la paleta de colores M3 con soporte para:
+ * - Modo Claro, Oscuro o seguimiento del Sistema.
+ * - Material You dinámico en Android 12+ (con opción de activarlo/desactivarlo).
+ * - Paletas de color personalizadas de acento cuando Material You está desactivado o en Android < 12.
+ * - Escala de fuentes fijada a 1.0f para prevenir desbordes en pantalla móvil.
+ * - Tipografía activa elegida entre las 5 opciones nativas de Android.
  */
 @Composable
 fun MyApplicationTheme(
-  darkTheme: Boolean = isSystemInDarkTheme(),
-  // Dynamic color is available on Android 12+
+  themeMode: AppThemeMode = AppThemeMode.SYSTEM,
   dynamicColor: Boolean = true,
+  accentPalette: AppAccentPalette = AppAccentPalette.PURPLE,
   fontTheme: AppFontTheme = AppFontTheme.DEFAULT,
   content: @Composable () -> Unit,
 ) {
+  val isDark = when (themeMode) {
+    AppThemeMode.SYSTEM -> isSystemInDarkTheme()
+    AppThemeMode.LIGHT -> false
+    AppThemeMode.DARK -> true
+  }
+
   val colorScheme =
     when {
       dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
         val context = LocalContext.current
-        if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        if (isDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
       }
 
-      darkTheme -> DarkColorScheme
-      else -> LightColorScheme
+      isDark -> {
+        DarkColorScheme.copy(
+          primary = accentPalette.primaryColor,
+          secondary = accentPalette.secondaryColor
+        )
+      }
+
+      else -> {
+        LightColorScheme.copy(
+          primary = accentPalette.primaryColor,
+          secondary = accentPalette.secondaryColor
+        )
+      }
     }
 
   // Se crea el conjunto de estilos tipográficos adaptado a la tipografía seleccionada
@@ -92,3 +112,4 @@ fun MyApplicationTheme(
     MaterialTheme(colorScheme = colorScheme, typography = typography, content = content)
   }
 }
+
