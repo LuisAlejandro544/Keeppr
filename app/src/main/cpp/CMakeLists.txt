@@ -70,7 +70,6 @@ set_target_properties(vaultnotes_rust PROPERTIES
 # C++ Native Bridge Library
 add_library(vaultnotes_native SHARED
     native-bridge.cpp
-    ../rust/rust_shim.c
 )
 
 target_include_directories(vaultnotes_native PRIVATE

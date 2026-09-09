@@ -101,11 +101,14 @@ import com.example.R
 import com.example.data.model.Note
 import com.example.ui.components.EmojiPickerDialog
 import com.example.ui.components.FontSelectionDialog
+import com.example.ui.components.LuaScriptDialog
+import com.example.ui.components.LuaInsertMode
 import com.example.ui.components.MarkdownToolbar
 import com.example.ui.markdown.MarkdownPreview
 import com.example.ui.theme.AppFontTheme
 import com.example.ui.viewmodel.EditorMode
 import androidx.compose.material.icons.filled.FormatSize
+import androidx.compose.material.icons.filled.AutoAwesome
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -136,6 +139,7 @@ fun NoteEditorScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showTagsEditor by remember { mutableStateOf(false) }
     var showFontDialog by remember { mutableStateOf(false) }
+    var showLuaDialog by remember { mutableStateOf(false) }
     var showExportDialog by remember { mutableStateOf(false) }
     var showEncryptDialog by remember { mutableStateOf(false) }
     var showRemoveEncryptionDialog by remember { mutableStateOf(false) }
@@ -341,6 +345,22 @@ fun NoteEditorScreen(
                             )
 
                             DropdownMenuItem(
+                                text = { Text(stringResource(R.string.lua_scripts_title)) },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.AutoAwesome,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                },
+                                onClick = {
+                                    showOptionsMenu = false
+                                    showLuaDialog = true
+                                },
+                                modifier = Modifier.testTag("editor_lua_scripts_button")
+                            )
+
+                            DropdownMenuItem(
                                 text = { Text(stringResource(R.string.export_note)) },
                                 leadingIcon = {
                                     Icon(
@@ -415,6 +435,7 @@ fun NoteEditorScreen(
                         }
                     },
                     onOpenFontDialog = { showFontDialog = true },
+                    onOpenLuaDialog = { showLuaDialog = true },
                     modifier = Modifier.testTag("editor_markdown_toolbar")
                 )
             }
@@ -859,6 +880,40 @@ fun NoteEditorScreen(
             onConfirm = {
                 showRemoveEncryptionDialog = false
                 onRemoveEncryption()
+            }
+        )
+    }
+
+    if (showLuaDialog) {
+        LuaScriptDialog(
+            currentContent = contentFieldValue.text,
+            currentTitle = note.title,
+            onDismiss = { showLuaDialog = false },
+            onApplyResult = { generatedText, insertMode ->
+                val text = contentFieldValue.text
+                val selection = contentFieldValue.selection
+                val newText = when (insertMode) {
+                    LuaInsertMode.CURSOR -> {
+                        val start = selection.start
+                        val end = selection.end
+                        text.substring(0, start) + generatedText + text.substring(end)
+                    }
+                    LuaInsertMode.APPEND -> {
+                        if (text.isBlank()) generatedText else "$text\n\n$generatedText"
+                    }
+                    LuaInsertMode.REPLACE -> {
+                        generatedText
+                    }
+                }
+                val newCursorPos = when (insertMode) {
+                    LuaInsertMode.CURSOR -> selection.start + generatedText.length
+                    LuaInsertMode.APPEND, LuaInsertMode.REPLACE -> newText.length
+                }
+                contentFieldValue = TextFieldValue(
+                    text = newText,
+                    selection = TextRange(newCursorPos)
+                )
+                onContentChange(newText)
             }
         )
     }

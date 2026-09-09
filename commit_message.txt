@@ -45,3 +45,21 @@ feat(crypto): integrar sistema de cifrado nativo de notas con contraseña proteg
   * Probada y verificada la conversión del logo oficial de Keeppr: reducción del 78.7% de peso de archivo (de 388.98 KB en JPG a 82.68 KB en WebP) preservando el 100% de la fidelidad visual.
   * Configurado el recurso `ic_keeppr_logo.webp` como el logo e icono adaptativo principal de la aplicación en `app/src/main/res/drawable/ic_launcher_foreground.xml`.
   * Actualizada la documentación del proyecto (`README.md`, `ROADMAP.md`, `STRUCTURE.md`, `AI_CONTEXT.md`) con las instrucciones de uso del script y la arquitectura de recursos gráficos en WebP.
+
+- Corrección del fallo de compilación en la tarea Gradle :app:cargoBuild (Rust toolchain y CI/CD):
+  * Identificada y resuelta la causa raíz del error 101 en `cargoBuild`: implementada la función `compute_sha256` en `app/src/main/rust/src/lib.rs` requerida por las rutinas de hashing y verificación criptográfica.
+  * Eliminada la declaración redundante `extern "C"` anidada en `rust_encrypt_note` que provocaba conflictos de compilación en rustc.
+  * Saneado el archivo `Cargo.toml` de Rust eliminando dependencias externas innecesarias que provocaban fallos por la edición 2024 de crates transitivos (`base64ct`) en Cargo.
+  * Robustecida la tarea Gradle `cargoBuild` en `app/build.gradle.kts`: detección dinámica y resiliente del NDK de Android, configuración de variables de entorno para enlazador y archivador (`CARGO_TARGET_*_LINKER`, `AR_*`, `CC_*`), y soporte automático de generación estática para entornos sin targets preinstalados.
+  * Refactorizado `CMakeLists.txt` para enlazar `libvaultnotes_rust.a` de forma limpia eliminando duplicación de símbolos.
+  * Actualizado el nombre del artefacto descargable en el flujo de GitHub Actions (`build-debug.yml`) a `Keeppr-Debug-APK`.
+
+- feat(lua): habilitar ejecución de scripts y automatizaciones en notas con plantilla diaria y editor personalizado:
+  * Implementado método JNI `executeLuaWithContext` en C++ (`native-bridge.cpp`) y `evalLuaWithContext` en `NativeEngine.kt`, inyectando las variables globales `content` y `title` directamente en el estado oficial de Lua 5.4.6.
+  * Diseñado el componente `LuaScriptDialog.kt` en Jetpack Compose con navegación por pestañas:
+    - Pestaña de Plantillas Rápidas con generador oficial de "Plantilla de Registro Diario" en Lua con fecha, hora, checklist interactivo y secciones de notas y reflexión.
+    - Pestaña de Script Personalizado con editor monoespaciado, píldoras de atajos rápidos (`content`, `title`, `os.date()`, `return`), botón de prueba aislada con visualización diferenciada de salida/errores y 3 modos de inserción (*En el cursor*, *Al final* o *Reemplazar todo*).
+  * Integrado el acceso a scripts Lua en `NoteEditorScreen.kt` mediante el menú de desbordamiento de la barra superior y mediante un botón táctil accesible ("🪄 Lua") en la barra de herramientas `MarkdownToolbar.kt`.
+  * Añadidas cadenas internacionalizadas para el diálogo de scripts en `strings.xml`.
+  * Actualizada la documentación técnica del proyecto (`README.md`, `ROADMAP.md`, `STRUCTURE.md` y `AI_CONTEXT.md`) para documentar las nuevas capacidades del motor Lua en notas.
+

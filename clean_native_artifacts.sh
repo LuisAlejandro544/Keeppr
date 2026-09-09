@@ -48,4 +48,4 @@ find . -type f -name "*.luac" -exec rm -vf {} + 2>/dev/null || true
 # Limpiar temporales de descarga en /tmp si existen
 rm -rf /tmp/lua* /tmp/rust_test 2>/dev/null || true
 
-echo "✅ [VaultNotes] Limpieza de artefactos nativos completada exitosamente al 100%."
+echo "✅ [Keeppr] Limpieza de artefactos nativos completada exitosamente al 100%."

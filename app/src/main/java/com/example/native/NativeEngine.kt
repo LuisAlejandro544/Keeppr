@@ -51,6 +51,23 @@ object NativeEngine {
     }
 
     /**
+     * Ejecuta un script de Lua inyectando el contexto de la nota activa (contenido y título)
+     * como variables globales de Lua (`content` y `title`).
+     * Permite transformaciones de texto en tiempo real, generación de plantillas dinámicas y automatizaciones.
+     */
+    fun evalLuaWithContext(script: String, content: String, title: String = ""): String {
+        return if (isLoaded) {
+            try {
+                executeLuaWithContext(script, content, title)
+            } catch (e: Throwable) {
+                "Error Lua: ${e.message}"
+            }
+        } else {
+            "Motor Lua no disponible"
+        }
+    }
+
+    /**
      * Calcula el tiempo estimado de lectura en segundos utilizando el núcleo nativo de Rust.
      */
     fun calculateReadingTimeSecs(wordCount: Int): Int {
@@ -211,6 +228,7 @@ object NativeEngine {
 
     private external fun getNativeInfo(): String
     private external fun executeLua(script: String): String
+    private external fun executeLuaWithContext(script: String, content: String, title: String): String
     private external fun calculateReadingTimeInRust(wordCount: Int): Int
     private external fun processNoteSummaryInRust(content: String, maxSnippetLen: Int): String
     private external fun matchNoteInRust(query: String, title: String, content: String, tags: String): Boolean

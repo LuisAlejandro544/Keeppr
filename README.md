@@ -76,13 +76,18 @@ gradle :app:testDebugUnitTest
 
 3. **Núcleo de Cómputo y Aceleración en Rust:**
    - Criptografía, operaciones de hashing y procesamiento de texto en bajo nivel compiladas como librería estática nativa (`libvaultnotes_rust.a`).
+   - Implementación pura y sin dependencias externas complejas (zero-dependency self-contained), garantizando compatibilidad total con toolchains estándar de Rust (Cargo) y evitando fallos de compatibilidad con ediciones modernas (`edition2024`).
+   - Tarea de construcción automatizada `cargoBuild` en Gradle con detección inteligente del NDK y soporte de enlazado y archivado cruzado (`aarch64-linux-android`, `x86_64-linux-android`, `armv7-linux-androideabi`).
    - Aceleración nativa de carga y renderizado de notas: extracción de extractos limpios de Markdown (`snippet`), cálculo de métricas y tiempo de lectura en una sola pasada en memoria nativa (`rust_process_note_summary`).
    - Algoritmo de búsqueda rápida insensible a mayúsculas y acentos (`rust_match_note`) ejecutado en memoria nativa y coordinado con corrutinas reactivas en Kotlin (`Dispatchers.Default`).
    - Interfaz C FFI (`extern "C"`) de cero coste de abstracción y compatible con 64 bits (`arm64-v8a`, `x86_64`) y 32 bits (`armeabi-v7a`).
 
-4. **Intérprete C Oficial de Lua 5.4.6:**
-   - Motor oficial de Lua compilado en C11 estático.
-   - Permite la ejecución y evaluación dinámica de scripts y expresiones lógicas directamente desde el dispositivo.
+4. **Intérprete C Oficial de Lua 5.4.6 y Automatizaciones en Notas:**
+   - Motor oficial de Lua compilado en C11 estático sin intermediarios pesados.
+   - **Acceso directo desde el editor de notas:** Accesible tanto desde el menú de opciones de la barra superior como mediante el botón interactivo "🪄 Lua" en la barra de herramientas Markdown.
+   - **Inyección de contexto en memoria:** El motor C inyecta las variables globales `content` (texto de la nota activa) y `title` (título de la nota) para permitir scripts reactivos y transformaciones instantáneas.
+   - **Plantilla de Registro Diario:** Script nativo de Lua que genera con un solo toque un formato estructurado en Markdown con fecha y hora del sistema, listas de objetivos con casillas interactivas, notas rápidas y sección de reflexión.
+   - **Editor de Script Personalizado:** Permite escribir o pegar scripts en Lua 5.4 con fuente monoespaciada, atajos de variables (`content`, `title`, `os.date()`, `return`), prueba aislada con visualización de salida/errores y tres modos de inserción en la nota activa (*En el cursor*, *Al final* o *Reemplazar todo*).
 
 5. **Puente JNI en C++17:**
    - Enlace bidireccional entre la JVM/ART de Kotlin y las librerías nativas con manejo de excepciones y validación de tipos JNI.

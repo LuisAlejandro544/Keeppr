@@ -67,4 +67,20 @@
     <string name="decrypt_error_wrong_password">Contraseña incorrecta. Inténtalo de nuevo.</string>
     <string name="encrypted_note_card_snippet">Contenido protegido con contraseña</string>
     <string name="more_options">Más opciones</string>
+    <string name="lua_scripts_title">Scripts Lua (Motor C 5.4)</string>
+    <string name="lua_scripts_desc">Ejecuta scripts en el motor oficial de Lua para generar plantillas o transformar el contenido de tu nota en tiempo real.</string>
+    <string name="lua_tab_templates">Plantillas Rápidas</string>
+    <string name="lua_tab_custom">Script Personalizado</string>
+    <string name="lua_daily_template_title">Plantilla de Registro Diario</string>
+    <string name="lua_daily_template_desc">Genera una estructura en Markdown con la fecha y hora actuales, objetivos con casillas interactivas, notas rápidas y sección de reflexión.</string>
+    <string name="lua_generate_template">Generar e Insertar</string>
+    <string name="lua_custom_script_title">Editor de Código Lua</string>
+    <string name="lua_custom_script_hint">-- Código Lua. Variables disponibles: \'content\' y \'title\'\nreturn content</string>
+    <string name="lua_run_test">Probar Script</string>
+    <string name="lua_insert_action">Insertar en Nota</string>
+    <string name="lua_insert_cursor">En el cursor</string>
+    <string name="lua_insert_append">Al final</string>
+    <string name="lua_replace_content">Reemplazar todo</string>
+    <string name="lua_output_title">Salida / Resultado:</string>
+    <string name="lua_applied_success">Script aplicado a la nota</string>
 </resources>

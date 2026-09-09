@@ -11,7 +11,7 @@ Plan de evolución técnica y funcional para la aplicación Keeppr (anteriorment
 - [x] Base de datos local Room con entidades de notas, categorías, etiquetas y búsqueda indexada.
 - [x] Integración de toolchains nativos simultáneos en Gradle:
   - C++17 mediante CMake y JNI (`libvaultnotes_native.so`).
-  - Rust mediante Cargo con soporte multiarquitectura: `arm64-v8a` (64 bits), `armeabi-v7a` (32 bits / Android Go) y `x86_64` (`libvaultnotes_rust.a`).
+  - Rust mediante Cargo con soporte multiarquitectura: `arm64-v8a` (64 bits), `armeabi-v7a` (32 bits / Android Go) y `x86_64` (`libvaultnotes_rust.a`), con compilación estática autosuficiente sin dependencias externas complejas y resolución resiliente de toolchain y variables de enlazado cruzado en CI/CD.
   - Motor C oficial de Lua 5.4.6 compilado estáticamente sin wrappers de terceros.
 - [x] Aceleración de procesamiento de notas y búsqueda en memoria nativa con Rust:
   - Extracción en una pasada nativa de métricas, conteo de palabras y snippets Markdown limpios (`rust_process_note_summary`).
@@ -50,11 +50,15 @@ Plan de evolución técnica y funcional para la aplicación Keeppr (anteriorment
 
 ---
 
-## 📍 Fase 3: Automatizaciones y Extensiones en Lua (Próximamente ⏳)
+## 📍 Fase 3: Automatizaciones y Extensiones en Lua (En Curso 🔄)
 
-- [ ] Sandbox seguro de Lua para transformar texto de notas (resúmenes, formateo Markdown, reemplazo regex).
-- [ ] Sistema de plantillas configurables por el usuario impulsadas por scripts de Lua.
+- [x] Ejecución de scripts y plantillas de Lua directamente desde el editor de notas (`LuaScriptDialog`):
+  * Acceso rápido en la barra de herramientas Markdown ("🪄 Lua") y en el menú de desbordamiento de la barra superior.
+  * Inyección nativa en C++ JNI de variables globales de contexto (`content` y `title`) hacia el estado oficial de Lua 5.4.6.
+- [x] Generador de Plantilla de Registro Diario impulsado por script nativo de Lua: formato Markdown estructurado con fecha, hora, tareas y notas rápidas.
+- [x] Editor de Script de Lua personalizado interactivo con salida en vivo, manejo de errores y 3 modos de inserción (*En el cursor*, *Al final* o *Reemplazar todo*).
 - [ ] Procesamiento de notas en segundo plano mediante `WorkManager` con llamadas al motor Lua.
+- [ ] Repositorio de scripts comunitarios descargables o importables localmente.
 
 ---
 

@@ -93,6 +93,73 @@ Java_com_example_native_NativeEngine_executeLua(
     return env->NewStringUTF(result.c_str());
 }
 
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_example_native_NativeEngine_executeLuaWithContext(
+        JNIEnv* env,
+        jobject /* this */,
+        jstring script,
+        jstring content,
+        jstring title) {
+
+    if (script == nullptr) {
+        return env->NewStringUTF("Error: Script nulo");
+    }
+
+    const char* nativeScript = env->GetStringUTFChars(script, nullptr);
+
+    // Inicializar estado oficial de Lua en C
+    lua_State* L = luaL_newstate();
+    if (L == nullptr) {
+        env->ReleaseStringUTFChars(script, nativeScript);
+        return env->NewStringUTF("Error: No se pudo inicializar el estado de Lua en C");
+    }
+
+    luaL_openlibs(L);
+
+    // Inyectar de forma segura las variables globales 'content' y 'title' para el script
+    if (content != nullptr) {
+        const char* nativeContent = env->GetStringUTFChars(content, nullptr);
+        lua_pushstring(L, nativeContent);
+        lua_setglobal(L, "content");
+        env->ReleaseStringUTFChars(content, nativeContent);
+    } else {
+        lua_pushstring(L, "");
+        lua_setglobal(L, "content");
+    }
+
+    if (title != nullptr) {
+        const char* nativeTitle = env->GetStringUTFChars(title, nullptr);
+        lua_pushstring(L, nativeTitle);
+        lua_setglobal(L, "title");
+        env->ReleaseStringUTFChars(title, nativeTitle);
+    } else {
+        lua_pushstring(L, "");
+        lua_setglobal(L, "title");
+    }
+
+    std::string result;
+    int status = luaL_dostring(L, nativeScript);
+    if (status != LUA_OK) {
+        const char* err = lua_tostring(L, -1);
+        result = std::string("Error Lua: ") + (err ? err : "desconocido");
+    } else {
+        if (lua_isstring(L, -1)) {
+            result = lua_tostring(L, -1);
+        } else if (lua_isnumber(L, -1)) {
+            result = std::to_string(lua_tonumber(L, -1));
+        } else if (lua_isboolean(L, -1)) {
+            result = lua_toboolean(L, -1) ? "true" : "false";
+        } else {
+            result = "OK (Ejecución completada sin valor de retorno)";
+        }
+    }
+
+    lua_close(L);
+    env->ReleaseStringUTFChars(script, nativeScript);
+
+    return env->NewStringUTF(result.c_str());
+}
+
 extern "C" JNIEXPORT jint JNICALL
 Java_com_example_native_NativeEngine_calculateReadingTimeInRust(
         JNIEnv* /* env */,

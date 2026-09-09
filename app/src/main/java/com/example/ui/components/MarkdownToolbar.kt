@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.sp
 fun MarkdownToolbar(
     onInsertText: (prefix: String, suffix: String) -> Unit,
     onOpenFontDialog: (() -> Unit)? = null,
+    onOpenLuaDialog: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -43,6 +44,9 @@ fun MarkdownToolbar(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            if (onOpenLuaDialog != null) {
+                ToolbarButton(label = "🪄 Lua", testTag = "toolbar_lua") { onOpenLuaDialog() }
+            }
             ToolbarButton(label = "H1", testTag = "toolbar_h1") { onInsertText("\n# ", "") }
             ToolbarButton(label = "H2", testTag = "toolbar_h2") { onInsertText("\n## ", "") }
             ToolbarButton(label = "H3", testTag = "toolbar_h3") { onInsertText("\n### ", "") }

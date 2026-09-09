@@ -282,6 +282,16 @@ fn sha256(data: &[u8]) -> [u8; 32] {
     result
 }
 
+fn compute_sha256(data: &[u8]) -> String {
+    let digest = sha256(data);
+    let mut hex = String::with_capacity(64);
+    for byte in digest {
+        use std::fmt::Write;
+        let _ = write!(hex, "{:02x}", byte);
+    }
+    hex
+}
+
 fn compute_vault_digest(payload: &[u8]) -> String {
     let mut salted = Vec::with_capacity(VAULT_SALT.len() + payload.len());
     salted.extend_from_slice(VAULT_SALT);
@@ -362,12 +372,6 @@ pub extern "C" fn rust_encrypt_note(content: *const c_char, password: *const c_c
         return CString::new("").unwrap().into_raw();
     }
 
-    // Usamos la implementación de rust_shim o nativa
-    extern "C" {
-        fn rust_encrypt_note(content: *const c_char, password: *const c_char) -> *mut c_char;
-    }
-    // Para evitar ambigüedades, cuando se compila en Rust standalone se puede implementar,
-    // o delegar si rust_shim está enlazado. En lib.rs implementamos la lógica directamente:
     let content_bytes = content_str.as_bytes();
     let mut salt = [0u8; 16];
     let mut iv = [0u8; 16];

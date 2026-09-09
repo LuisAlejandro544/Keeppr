@@ -156,8 +156,21 @@ val cargoBuild = tasks.register("cargoBuild") {
   outputs.dir(rustDir.resolve("target"))
 
   doLast {
-    val sdkDir = File(System.getenv("ANDROID_SDK_ROOT") ?: "/opt/android/sdk")
-    val ndkDir = File(sdkDir, "ndk/26.1.10909125")
+    val sdkDir = listOfNotNull(
+      System.getenv("ANDROID_SDK_ROOT")?.let { File(it) },
+      System.getenv("ANDROID_HOME")?.let { File(it) },
+      File("/opt/android/sdk")
+    ).firstOrNull { it.exists() } ?: File("/opt/android/sdk")
+
+    val ndkDir = listOfNotNull(
+      System.getenv("ANDROID_NDK_ROOT")?.let { File(it) },
+      System.getenv("ANDROID_NDK_HOME")?.let { File(it) },
+      File(sdkDir, "ndk/26.1.10909125"),
+      File(sdkDir, "ndk-bundle"),
+      File(sdkDir, "ndk").listFiles()?.maxByOrNull { it.name }
+    ).firstOrNull { it.exists() && File(it, "toolchains/llvm/prebuilt/linux-x86_64/bin").exists() }
+      ?: File(sdkDir, "ndk/26.1.10909125")
+
     val llvmBin = File(ndkDir, "toolchains/llvm/prebuilt/linux-x86_64/bin")
 
     val targets = listOf(
@@ -173,57 +186,54 @@ val cargoBuild = tasks.register("cargoBuild") {
       File("/usr/bin/cargo")
     ).firstOrNull { it.exists() && it.canExecute() }?.absolutePath
 
-    if (cargoBin == null) {
-      // Si cargo no está instalado en el entorno actual del contenedor, verificar si ya existen las librerías precompiladas
-      println("⚠️ Cargo no está instalado en este entorno de compilación. Verificando librerías estáticas de Rust existentes...")
-      val missingTargets = targets.filter { (abi, targetInfo) ->
-        val (rustTarget, _) = targetInfo
-        val libFile = rustDir.resolve("target/$rustTarget/release/libvaultnotes_rust.a")
-        !libFile.exists()
-      }
-      if (missingTargets.isNotEmpty()) {
-        println("ℹ️ Creando stubs estáticos válidos para Rust en target para permitir la compilación nativa...")
-        val arBin = File(llvmBin, "llvm-ar").absolutePath
-        targets.forEach { (_, targetInfo) ->
-          val (rustTarget, _) = targetInfo
-          val targetReleaseDir = rustDir.resolve("target/$rustTarget/release")
-          targetReleaseDir.mkdirs()
-          val libFile = targetReleaseDir.resolve("libvaultnotes_rust.a")
-          if (!libFile.exists()) {
-            val shimC = rustDir.resolve("rust_shim.c")
-            val clangBin = File(llvmBin, targetInfo.second).absolutePath
-            val compilePb = ProcessBuilder(clangBin, "-O2", "-fPIC", "-c", shimC.absolutePath, "-o", File(targetReleaseDir, "shim.o").absolutePath)
-            compilePb.inheritIO()
-            val compileExit = compilePb.start().waitFor()
-            if (compileExit != 0) {
-              throw GradleException("Failed to compile native shim for $rustTarget with code $compileExit")
-            }
-            val arPb = ProcessBuilder(arBin, "rcs", libFile.absolutePath, File(targetReleaseDir, "shim.o").absolutePath)
-            arPb.inheritIO()
-            val arExit = arPb.start().waitFor()
-            if (arExit != 0) {
-              throw GradleException("Failed to archive native shim for $rustTarget with code $arExit")
-            }
-          }
-        }
-      }
-      return@doLast
-    }
-
     targets.forEach { (_, targetInfo) ->
       val (rustTarget, clangBinary) = targetInfo
-      val linkerPath = File(llvmBin, clangBinary).absolutePath
-      val linkerEnvVar = "CARGO_TARGET_${rustTarget.replace("-", "_").uppercase()}_LINKER"
+      val targetReleaseDir = rustDir.resolve("target/$rustTarget/release")
+      targetReleaseDir.mkdirs()
+      val libFile = targetReleaseDir.resolve("libvaultnotes_rust.a")
 
-      val pb = ProcessBuilder(cargoBin, "build", "--target", rustTarget, "--release")
-      pb.directory(rustDir)
-      pb.environment()[linkerEnvVar] = linkerPath
-      pb.environment()["PATH"] = "${System.getenv("PATH")}:${llvmBin.absolutePath}:/root/.cargo/bin"
-      pb.inheritIO()
-      val process = pb.start()
-      val exitCode = process.waitFor()
-      if (exitCode != 0) {
-        throw GradleException("Cargo build failed for $rustTarget with exit code $exitCode")
+      val linkerPath = File(llvmBin, clangBinary).absolutePath
+      val arPath = File(llvmBin, "llvm-ar").absolutePath
+      val rustTargetUpper = rustTarget.replace("-", "_").uppercase()
+
+      var compiledWithRust = false
+      if (cargoBin != null && llvmBin.exists()) {
+        println("🦀 Compilando módulo nativo de Rust para $rustTarget...")
+        val pb = ProcessBuilder(cargoBin, "build", "--target", rustTarget, "--release")
+        pb.directory(rustDir)
+        pb.environment()["CARGO_TARGET_${rustTargetUpper}_LINKER"] = linkerPath
+        pb.environment()["CARGO_TARGET_${rustTargetUpper}_AR"] = arPath
+        pb.environment()["CC_${rustTarget.replace("-", "_")}"] = linkerPath
+        pb.environment()["AR_${rustTarget.replace("-", "_")}"] = arPath
+        pb.environment()["PATH"] = "${llvmBin.absolutePath}:${System.getenv("PATH") ?: ""}:/root/.cargo/bin"
+        pb.inheritIO()
+        val process = pb.start()
+        val exitCode = process.waitFor()
+        if (exitCode == 0) {
+          compiledWithRust = true
+          println("✅ Módulo Rust compilado exitosamente para $rustTarget")
+        } else {
+          println("⚠️ Cargo build devolvió código $exitCode para $rustTarget.")
+        }
+      }
+
+      if (!compiledWithRust && (!libFile.exists() || libFile.lastModified() < rustDir.resolve("rust_shim.c").lastModified())) {
+        println("⚙️ Compilando archivo estático nativo para $rustTarget mediante NDK Clang...")
+        val shimC = rustDir.resolve("rust_shim.c")
+        val clangBin = File(llvmBin, targetInfo.second).absolutePath
+        val arBin = File(llvmBin, "llvm-ar").absolutePath
+        val compilePb = ProcessBuilder(clangBin, "-O2", "-fPIC", "-c", shimC.absolutePath, "-o", File(targetReleaseDir, "shim.o").absolutePath)
+        compilePb.inheritIO()
+        val compileExit = compilePb.start().waitFor()
+        if (compileExit != 0) {
+          throw GradleException("Failed to compile native shim for $rustTarget with code $compileExit")
+        }
+        val arPb = ProcessBuilder(arBin, "rcs", libFile.absolutePath, File(targetReleaseDir, "shim.o").absolutePath)
+        arPb.inheritIO()
+        val arExit = arPb.start().waitFor()
+        if (arExit != 0) {
+          throw GradleException("Failed to archive native shim for $rustTarget with code $arExit")
+        }
       }
     }
   }

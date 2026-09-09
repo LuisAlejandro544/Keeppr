@@ -44,8 +44,9 @@ Este documento detalla el árbol de directorios, la organización de módulos y 
 │       │   │   ├── ui/                    # Capa de Presentación (Jetpack Compose)
 │       │   │   │   ├── components/
 │       │   │   │   │   ├── EmojiPickerDialog.kt    # Selector de iconos/emojis para notas
-│       │   │   │   │   ├── MarkdownToolbar.kt      # Barra de herramientas Markdown móvil (con botón 'Aa Fuente')
+│       │   │   │   │   ├── MarkdownToolbar.kt      # Barra de herramientas Markdown móvil (con botones 'Aa Fuente' y '🪄 Lua')
 │       │   │   │   │   ├── FontSelectionDialog.kt  # Selector de tipografías con alcance dual (toda la nota vs selección)
+│       │   │   │   │   ├── LuaScriptDialog.kt      # Diálogo interactivo para ejecutar scripts/plantillas Lua (Plantilla Diaria y Script Personalizado)
 │       │   │   │   │   ├── SettingsDialog.kt       # Diálogo modal de Ajustes: Modo Claro/Oscuro/Sistema, Material You, Acentos y Fuentes
 │       │   │   │   │   └── EncryptionDialogs.kt    # Diálogos modales: EncryptNoteDialog, DecryptNoteDialog, RemoveEncryptionDialog
 │       │   │   │   ├── debug/                 # Componentes Visuales de Depuración y Rendimiento
@@ -92,7 +93,7 @@ Este documento detalla el árbol de directorios, la organización de módulos y 
 
 ### 1. Capa Nativa (`app/src/main/cpp` y `app/src/main/rust`)
 - **`CMakeLists.txt`**: Orquesta la compilación cruzada para las arquitecturas `arm64-v8a` (64 bits), `armeabi-v7a` (32 bits / Android Go) y `x86_64` (emuladores). Compila el código oficial de Lua 5.4.6 como librería estática en C11 (`liblua_static.a`), integra las funciones C/Rust e incluye el runtime de Rust precompilado por la tarea `cargoBuild` de Gradle.
-- **`native-bridge.cpp`**: Punto de contacto JNI (`Java_com_example_native_NativeEngine_*`). Inicializa y destruye estados de Lua (`lua_State`), evalúa scripts de usuario capturando salidas con `lua_pcall`, enlaza métodos criptográficos (`encryptNoteInRust`, `decryptNoteInRust`, `isEncryptedPayloadInRust`) e invoca las funciones exportadas por Rust.
+- **`native-bridge.cpp`**: Punto de contacto JNI (`Java_com_example_native_NativeEngine_*`). Inicializa y destruye estados de Lua (`lua_State`), evalúa scripts de usuario capturando salidas con `lua_pcall`, inyecta variables globales de contexto (`content` y `title` vía `executeLuaWithContext`), enlaza métodos criptográficos (`encryptNoteInRust`, `decryptNoteInRust`, `isEncryptedPayloadInRust`) e invoca las funciones exportadas por Rust.
 - **`lib.rs` (Rust) & `rust_shim.c`**: Funciones seguras de cálculo, hashing y criptografía expuestas con firmas ABI C (`#[no_mangle] pub extern "C"`). Incluye:
   * Motor criptográfico offline: cifrado simétrico AES-256-CBC con padding PKCS#7, derivación de clave PBKDF2-HMAC-SHA256 (10,000 rondas), código MAC HMAC-SHA256 y serialización `VAULT_ENC_V1$<salt>$<iv>$<ciphertext>$<mac>`.
   * Motor acelerador de procesamiento de texto: cálculo de métricas de lectura y snippets de Markdown en una pasada nativa (`rust_process_note_summary`).
