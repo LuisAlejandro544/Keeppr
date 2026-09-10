@@ -17,12 +17,12 @@
 # Sobrecarga agresiva de nombres de métodos para minimizar la tabla de métodos DEX
 -overloadaggressively
 
-# Oculta nombres de archivos fuente originales para reducir tamaño de strings
--renamesourcefileattribute SourceFile
--keepattributes SourceFile,LineNumberTable
+# Se descarta el atributo SourceFile para no incrustar la cadena redundante "SourceFile" en miles de clases del DEX.
+# Solo se conserva la tabla de números de línea para reportes de error mínimos.
+-keepattributes LineNumberTable
 
 # ------------------------------------------------------------------------------
-# 2. ELIMINACIÓN DE LLAMADAS A LOGS DE DEPURACIÓN EN RELEASE
+# 2. ELIMINACIÓN DE LLAMADAS A LOGS Y DEPURACIÓN EN RELEASE
 # ------------------------------------------------------------------------------
 # Remueve llamadas a Log.v, Log.d y Log.i en tiempo de compilación para ahorrar espacio en .dex y ciclos de CPU
 -assumenosideeffects class android.util.Log {
@@ -32,11 +32,19 @@
     public static int i(...);
 }
 
+# Remueve llamadas a Throwable.printStackTrace() en release para ahorrar bytecode e instrucciones de depuracion
+-assumenosideeffects java.lang.Throwable {
+    public void printStackTrace();
+}
+
 # ------------------------------------------------------------------------------
 # 3. CAPA NATIVA (C++, RUST, LUA 5.4.6 Y JNI) - CRÍTICO
 # ------------------------------------------------------------------------------
-# No renombrar ningún método nativo en ninguna clase para evitar UnsatisfiedLinkError en JNI
+# No renombrar ni eliminar ningún método nativo en ninguna clase para evitar UnsatisfiedLinkError en JNI
 -keepclasseswithmembernames class * {
+    native <methods>;
+}
+-keepclasseswithmembers class * {
     native <methods>;
 }
 
@@ -62,9 +70,23 @@
 -dontwarn androidx.room.**
 
 # ------------------------------------------------------------------------------
-# 5. JETPACK COMPOSE Y KOTLIN COROUTINES
+# 5. OPTIMIZACIÓN DE KOTLIN INTRINSICS Y CORRUTINAS
 # ------------------------------------------------------------------------------
--keep class androidx.compose.runtime.** { *; }
+# Se remueve la regla sobreprotectora de Compose runtime para permitir a R8 podar código muerto.
+# Remueve validaciones repetitivas de argumentos y nulidad en código compilado de Release:
+-assumenosideeffects class kotlin.jvm.internal.Intrinsics {
+    public static void checkNotNullParameter(java.lang.Object, java.lang.String);
+    public static void checkParameterIsNotNull(java.lang.Object, java.lang.String);
+    public static void checkNotNull(java.lang.Object);
+    public static void checkNotNull(java.lang.Object, java.lang.String);
+    public static void checkExpressionValueIsNotNull(java.lang.Object, java.lang.String);
+}
+
+# Poda de seguimiento de depuración y aserciones internas de Kotlin Coroutines:
+-assumenosideeffects class kotlinx.coroutines.DebugKt {
+    public static boolean getASSERTIONS_ENABLED();
+    public static boolean getDEBUG();
+}
 -dontwarn kotlinx.coroutines.**
 -dontwarn java.lang.invoke.**
 

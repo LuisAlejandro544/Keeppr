@@ -59,9 +59,15 @@ Keeppr es una aplicación móvil de notas personales de alto rendimiento, diseñ
 * **Exclusión de Arquitecturas de PC:** El binario Release descarta estrictamente librerías nativas para emuladores x86/x86_64 (`lib/x86_64` y `lib/x86`), garantizando un empaquetado 100% puro para procesadores móviles (`arm64-v8a` de 64 bits y `armeabi-v7a` de 32 bits).
 * **Verificación de Integridad:** Se adjuntan sumas de verificación `SHA256SUMS.txt` en cada publicación de GitHub y canal Uptodown para comprobar que el archivo descargado no haya sufrido corrupción ni manipulación en tránsito.
 
-### ⚡ 9. Optimización Extrema de Peso con R8 y Experiencia Inicial
-* **Reducción del APK de 22 MB a ~4.45 MB:** Activación completa de R8 (`isMinifyEnabled = true`, `isShrinkResources = true`) con `proguard-android-optimize.txt`, reduciendo el peso de descarga en más del 79%.
-* **5 Pasadas de Optimización:** Inlining agresivo y fusión de clases preservando la compatibilidad absoluta con JNI nativo (`NativeEngine`), Room Database y Kotlin Coroutines.
+### ⚡ 9. Optimización Extrema con R8 Full Mode, Empaquetado Nativo Directo y Almacenamiento Instalado
+* **Activación de R8 Full Mode:** `android.enableR8.fullMode=true` para colapsar lambdas de Kotlin, fusionar clases sintéticas y compactar bytecode DEX (`classes.dex`), reduciendo el tamaño del código compilado en el teléfono (`base.odex`).
+* **Blindaje Nativo Completo:** Reglas ProGuard fortalecidas con `-keepclasseswithmembernames` y `-keepclasseswithmembers` para proteger todas las firmas nativas y métodos de `com.example.native.**` en C++, Rust y Lua 5.4.6.
+* **Poda de Código Muerto en Compose:** Retirada la regla sobreprotectora estática de Compose runtime, permitiendo a R8 podar métodos innecesarios mediante sus reglas oficiales.
+* **Eliminación de Kotlin Intrinsics:** Supresión de comprobaciones redundantes de argumentos y nulidad en el binario final de release.
+* **Empaquetado Nativo sin Duplicación en Disco (`extractNativeLibs = false`):** Las librerías `.so` se empaquetan alineadas a páginas y sin comprimir (`useLegacyPackaging = false`), permitiendo al sistema operativo Android (API 26+) ejecutarlas directamente desde el APK sin extraerlas a `/data/app/.../lib/`. Esto ahorra de 3 a 5 MB de espacio de usuario al instalarse en teléfonos de 32 bits (`armeabi-v7a`) y 64 bits (`arm64-v8a`).
+* **Poda de Dependencias No Utilizadas:** Removidas del empaquetado de producción librerías no requeridas (`Retrofit`, `Moshi`, interceptor de logs y generadores KSP asociados).
+* **Purga de Idiomas en `resources.arsc`:** Configurado `resourceConfigurations += listOf("es", "en")`, eliminando más de 75 idiomas no soportados inyectados por dependencias externas y reduciendo significativamente la tabla de recursos.
+* **Exclusión de Metadatos de Desarrollo:** Bloqueada la inclusión de `META-INF/*.kotlin_module` y metadatos de compilación en el paquete final.
 * **Nota de Bienvenida Oficial y Única:** Sustitución de notas de demostración por una única nota de bienvenida explicativa que detalla el uso del editor Markdown, checklists interactivas, cifrado AES-256-GCM / Argon2id, automatizaciones Lua y funcionamiento 100% local.
 
 ---

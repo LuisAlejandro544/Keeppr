@@ -27,7 +27,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.local.AppDatabase
 import com.example.data.repository.NoteRepository
@@ -247,11 +246,5 @@ fun VaultNotesApp(viewModel: NotesViewModel) {
 @Composable
 fun Greeting(name: String, modifier: Modifier = Modifier) {
   Text(text = "Hello $name!", modifier = modifier)
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-  MyApplicationTheme { Greeting("Android") }
 }
 

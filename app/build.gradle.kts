@@ -18,6 +18,9 @@ android {
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
+    // Podar recursos de más de 75 idiomas innecesarios heredados de librerías para compactar resources.arsc
+    resourceConfigurations += listOf("es", "en")
+
     externalNativeBuild {
       cmake {
         cppFlags("-std=c++17")
@@ -101,20 +104,32 @@ android {
   testOptions { unitTests { isIncludeAndroidResources = true } }
   dependenciesInfo {
     includeInApk = false
-    includeInBundle = true
+    includeInBundle = false
   }
   packaging {
+    jniLibs {
+      useLegacyPackaging = false
+    }
     resources {
       excludes += setOf(
         "META-INF/LICENSE.txt",
         "META-INF/LICENSE",
+        "META-INF/LICENSE*",
         "META-INF/NOTICE.txt",
         "META-INF/NOTICE",
+        "META-INF/NOTICE*",
+        "META-INF/INDEX.LIST",
+        "META-INF/licenses/**",
+        "META-INF/license/**",
+        "META-INF/*.md",
+        "META-INF/*.txt",
         "META-INF/*.version",
         "META-INF/androidx/**",
         "META-INF/DEPENDENCIES",
         "META-INF/AL2.0",
-        "META-INF/LGPL2.1"
+        "META-INF/LGPL2.1",
+        "META-INF/*.kotlin_module",
+        "META-INF/version-control-info.textproto"
       )
     }
   }
@@ -128,20 +143,20 @@ dependencies {
   implementation(libs.androidx.compose.material3)
   implementation(libs.androidx.compose.ui)
   implementation(libs.androidx.compose.ui.graphics)
-  implementation(libs.androidx.compose.ui.tooling.preview)
   implementation(libs.androidx.core.ktx)
   implementation(libs.androidx.lifecycle.runtime.compose)
   implementation(libs.androidx.lifecycle.runtime.ktx)
   implementation(libs.androidx.lifecycle.viewmodel.compose)
   implementation(libs.androidx.room.ktx)
   implementation(libs.androidx.room.runtime)
-  implementation(libs.converter.moshi)
+  // Dependencias no utilizadas comentadas para reducir APK y acelerar compilacion:
+  // implementation(libs.converter.moshi)
+  // implementation(libs.logging.interceptor)
+  // implementation(libs.moshi.kotlin)
+  // implementation(libs.retrofit)
   implementation(libs.kotlinx.coroutines.android)
   implementation(libs.kotlinx.coroutines.core)
-  implementation(libs.logging.interceptor)
-  implementation(libs.moshi.kotlin)
   implementation(libs.okhttp)
-  implementation(libs.retrofit)
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)
   testImplementation(libs.androidx.junit)
@@ -158,9 +173,10 @@ dependencies {
   androidTestImplementation(libs.androidx.runner)
   debugImplementation(libs.androidx.compose.ui.test.manifest)
   debugImplementation(libs.androidx.compose.ui.tooling)
+  debugImplementation(libs.androidx.compose.ui.tooling.preview)
   debugImplementation("com.squareup.leakcanary:leakcanary-android:2.14")
   "ksp"(libs.androidx.room.compiler)
-  "ksp"(libs.moshi.kotlin.codegen)
+  // "ksp"(libs.moshi.kotlin.codegen)
 }
 
 val cargoBuild = tasks.register("cargoBuild") {

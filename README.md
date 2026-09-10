@@ -39,7 +39,7 @@ El APK se genera en: `app/build/outputs/apk/debug/app-debug.apk`.
 gradle :app:assembleRelease
 ```
 El APK oficial se genera en: `app/build/outputs/apk/release/Keeppr-v0.1.0-b-Release.apk`.
-Gracias a la optimización agresiva de **R8 / ProGuard** y reducción de recursos (`isShrinkResources`), el tamaño final del APK se redujo drásticamente de **~22 MB a tan solo ~4.45 MB** (-79% de peso), garantizando una descarga ligera en conexiones móviles.
+Gracias a la optimización en **R8 Full Mode**, reducción de recursos (`isShrinkResources`), poda de dependencias no utilizadas (Retrofit, Moshi), filtrado estricto de recursos a español e inglés (`resourceConfigurations += listOf("es", "en")` eliminando más de 75 idiomas innecesarios de `resources.arsc`), exclusión de metadatos `META-INF/*.kotlin_module`, poda de Kotlin Intrinsics y eliminación de reglas redundantes de Compose, el tamaño del APK es ultra-compacto. Además, con la directiva `extractNativeLibs = false` y empaquetado nativo no duplicado (`useLegacyPackaging = false`), el sistema operativo no descomprime las librerías nativas `.so` en disco, ahorrando de 3 a 5 MB de espacio de usuario tanto en arquitecturas de 64 bits (`arm64-v8a`) como de 32 bits (`armeabi-v7a` / Android Go).
 Además, la app inicializa con una **única nota de bienvenida oficial** que guía al usuario sobre todas las funcionalidades activas de la versión.
 
 ### 3. Limpieza Total de Artefactos Nativos y Temporales

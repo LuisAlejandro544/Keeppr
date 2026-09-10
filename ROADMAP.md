@@ -114,6 +114,14 @@ Plan de evolución técnica y funcional para la aplicación Keeppr (anteriorment
   * Estructura inicial del servidor con jerarquía de roles: 👑 Creador, 🧪 Beta Tester, 💡 Colaborador y 📱 Miembro.
 - [x] **Habilitación y Ajuste de Reglas R8 / ProGuard (`app/proguard-rules.pro`):**
   * 5 pasadas de optimización y reducción de recursos logrando bajar el peso del APK de ~22 MB a solo ~4.45 MB sin romper firmas nativas JNI de C++, Rust o Lua 5.4.6.
+- [x] **Optimización en R8 Full Mode y Almacenamiento Instalado Ultra-Ligero:**
+  * Activación de `android.enableR8.fullMode=true` para colapsar lambdas de Kotlin, fusionar clases sintéticas y compactar bytecode DEX (`classes.dex`).
+  * Blindaje estricto de firmas JNI en C++, Rust y Lua (`-keepclasseswithmembernames` y `-keepclasseswithmembers`).
+  * Eliminación de regla sobreprotectora de Compose runtime permitiendo a R8 podar código muerto oficial.
+  * Poda de comprobaciones de nulidad repetitivas de Kotlin (`kotlin.jvm.internal.Intrinsics`).
+  * Empaquetado nativo sin extracción en disco (`android:extractNativeLibs="false"` y `useLegacyPackaging = false`), ahorrando entre 3 y 5 MB en el almacenamiento interno del usuario al evitar duplicar librerías `.so` en 32 y 64 bits.
+  * Poda de dependencias huérfanas de la plantilla (`Retrofit`, `Moshi`, interceptor de logs) y purga de más de 75 idiomas no soportados en `resources.arsc` mediante `resourceConfigurations = ["es", "en"]`.
+  * Exclusión de metadatos de desarrollo `META-INF/*.kotlin_module` en el empaquetado final.
 - [ ] Pruebas de compatibilidad en dispositivos Android Go y procesadores de 32 bits en hardware real.
 - [ ] Distribución del APK Beta en Uptodown y apertura de canales de feedback comunitarios (Discord / Telegram / Reddit).
 
