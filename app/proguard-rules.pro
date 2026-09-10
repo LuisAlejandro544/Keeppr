@@ -33,7 +33,7 @@
 }
 
 # Remueve llamadas a Throwable.printStackTrace() en release para ahorrar bytecode e instrucciones de depuracion
--assumenosideeffects java.lang.Throwable {
+-assumenosideeffects class java.lang.Throwable {
     public void printStackTrace();
 }
 

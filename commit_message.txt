@@ -1,42 +1,6 @@
-perf(r8): activar modo completo de r8, optimizar empaquetado nativo sin extraccion y podar intrinsics
+fix(proguard): corregir sintaxis de assumenosideeffects para java.lang.Throwable en r8
 
-- Activacion del Modo Completo de R8 (R8 Full Mode) (`gradle.properties`):
-  * Configurado `android.enableR8.fullMode=true` para habilitar el motor de optimizacion profunda de R8.
-  * Optimiza y colapsa agresivamente lambdas de Kotlin, sintetiza clases anonimas de Compose y reduce sustancialmente el tamano del archivo bytecode DEX (`classes.dex`), aligerando la compilacion AOT de Android ART (`base.odex`) en el telefono.
-
-- Preservacion Absoluta de la Capa Nativa (C++, Rust y Lua 5.4.6) (`app/proguard-rules.pro`):
-  * Blindadas las firmas nativas y metodos JNI con reglas explicitas `-keepclasseswithmembernames class * { native <methods>; }` y `-keepclasseswithmembers class * { native <methods>; }`.
-  * Protegidas al 100% las clases y metodos de `com.example.native.**`, previniendo que R8 Full Mode pode o renombre funciones nativas exportadas en C++, Rust o el interprete embebido de Lua.
-
-- Retiro de Regla Sobreprotectora de Compose Runtime (`app/proguard-rules.pro`):
-  * Removida la directiva estatica `-keep class androidx.compose.runtime.** { *; }` que impedia a R8 eliminar codigo muerto en Jetpack Compose.
-  * Compose ahora delega su proteccion a las reglas de consumidor oficiales integradas (`consumer-rules`), permitiendo podar metodos y clases no utilizados en tiempo de ejecucion.
-
-- Optimizacion de Empaquetado Nativo sin Duplicacion en Disco (`app/src/main/AndroidManifest.xml` y `app/build.gradle.kts`):
-  * Configurado `android:extractNativeLibs="false"` en la etiqueta `<application>` del manifiesto.
-  * Configurado `packaging.jniLibs.useLegacyPackaging = false` en Gradle para almacenar las librerias `.so` alineadas a 4KB/16KB y sin comprimir en el paquete APK.
-  * 100% seguro y compatible con dispositivos Android 8.0+ (API 26+ / `minSdk = 26`) tanto en arquitecturas de 64 bits (`arm64-v8a`) como de 32 bits (`armeabi-v7a` / Android Go).
-  * Evita que el sistema operativo duplique las librerias nativas extrayendolas a `/data/app/.../lib/`, ahorrando entre 3 y 5 MB de espacio en el almacenamiento interno del usuario al instalar la aplicacion.
-
-- Eliminacion de Comprobaciones Repetitivas de Nulidad de Kotlin (`app/proguard-rules.pro`):
-  * Aplicada directiva `-assumenosideeffects class kotlin.jvm.internal.Intrinsics` sobre metodos de verificacion interna (`checkNotNullParameter`, `checkParameterIsNotNull`, `checkNotNull`, etc.).
-  * Elimina miles de instrucciones de comprobacion innecesarias y cadenas de texto de argumentos en el binario final de produccion.
-
-- Poda de Dependencias No Utilizadas y Metadatos Residuales (`app/build.gradle.kts`):
-  * Retiradas dependencias innecesarias que venian en la plantilla original (`Retrofit`, `Moshi`, `Moshi Kotlin Codegen` en KSP y `HttpLoggingInterceptor`), aligerando la resolucion del grafo de dependencias y tiempos de compilacion.
-  * Configurado `resourceConfigurations += listOf("es", "en")` en `defaultConfig`, eliminando del paquete final de recursos (`resources.arsc`) mas de 75 idiomas no soportados incluidos por librerias externas.
-  * Excluidos metadatos de desarrollo en tiempo de compilacion (`META-INF/*.kotlin_module` y `META-INF/version-control-info.textproto`) en el empaquetado de recursos.
-
-- Poda de Depuracion y Aserciones Internas de Kotlin Coroutines (`app/proguard-rules.pro`):
-  * Aplicada directiva `-assumenosideeffects class kotlinx.coroutines.DebugKt` para descartar metodos de diagnostico (`getASSERTIONS_ENABLED()` y `getDEBUG()`).
-  * Elimina hilos de seguimiento de nombres de corrutinas y chequeos de depuracion en tiempo de compilacion para la variante de produccion Release, optimizando consumo de CPU y reduciendo el tamano del DEX.
-
-- Reduccion Extrema de Metadatos, Bytecode y Herramientas de Desarrollo:
-  * Exclusiones en Empaquetado (`META-INF/`): Agregadas reglas en `app/build.gradle.kts` para descartar archivos residuales de licencias, avisos e indices (`INDEX.LIST`, `licenses/**`, `license/**`, `LICENSE*`, `NOTICE*`, `*.md`, `*.txt`).
-  * Supresion del Atributo SourceFile (`app/proguard-rules.pro`): Removido `-renamesourcefileattribute SourceFile` y conservado unicamente `LineNumberTable` en `-keepattributes`, suprimiendo la cadena redundante "SourceFile" repetida en miles de clases del archivo DEX.
-  * Poda de Trazas de Pila (`app/proguard-rules.pro`): Instruido a R8 con `-assumenosideeffects java.lang.Throwable { public void printStackTrace(); }` para eliminar trazas de depuracion en bloques try/catch en el binario Release.
-  * Aislamiento de Compose Tooling Preview (`app/build.gradle.kts` y `MainActivity.kt`): Movida la libreria `libs.androidx.compose.ui.tooling.preview` a `debugImplementation` y retirada la funcion y anotacion de plantilla `@Preview`, erradicando herramientas de previsualizacion del APK final de produccion.
-  * Supresion de Metadatos de Auditoria de Paquete (`dependenciesInfo`): Configurado `includeInBundle = false` en `build.gradle.kts`, eliminando metadatos binarios de auditoria innecesarios para distribucion fuera de Google Play Store.
-
-- Actualizacion Integral de Documentacion del Proyecto:
-  * Actualizados `README.md`, `ROADMAP.md`, `STRUCTURE.md`, `AI_CONTEXT.md` y `Changelog-beta.md` con las nuevas directivas de rendimiento, almacenamiento e instalacion limpia.
+- Corrección de Parseo en R8 / ProGuard (`app/proguard-rules.pro`):
+  * Añadida la palabra clave `class` faltante en la regla de poda de trazas de pila: `-assumenosideeffects class java.lang.Throwable { public void printStackTrace(); }`.
+  * Resuelve el fallo de compilación en GitHub Actions (`minifyReleaseWithR8 FAILED: Expected [!]interface|@interface|class|enum`).
+  * Permite a R8 minificar y compilar exitosamente la variante de producción Release sin errores de sintaxis.
