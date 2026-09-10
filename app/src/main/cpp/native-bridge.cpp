@@ -51,6 +51,56 @@ Java_com_example_native_NativeEngine_getNativeInfo(
     return env->NewStringUTF(oss.str().c_str());
 }
 
+// Sandbox seguro para Lua 5.4:
+// Explicación de la lógica:
+// Carga exclusivamente las librerías puras de manipulación de datos: base, table, string, math, utf8 y coroutine.
+// Para la librería 'os', se carga pero se sanea exhaustivamente dejando únicamente funciones de fecha/hora:
+// 'date', 'time', 'clock' y 'difftime' (necesarias para plantillas diarias, timestamps y formateo temporal).
+// Se anulan de raíz 'execute' (ejecución de comandos en shell), 'remove'/'rename' (borrado/cambio de archivos),
+// 'tmpname', 'getenv' y 'exit' para impedir cualquier escape del sandbox.
+// Se excluyen deliberadamente 'io' (acceso arbitrario a archivos del sistema),
+// 'package' (carga de bibliotecas dinámicas no autorizadas) y 'debug' (introspección y escape de memoria).
+// Se anulan de _G las funciones 'dofile', 'loadfile' y 'load' para evitar vectores RCE.
+static void init_lua_safe_sandbox(lua_State* L) {
+    static const luaL_Reg safe_libs[] = {
+        {LUA_GNAME, luaopen_base},
+        {LUA_TABLIBNAME, luaopen_table},
+        {LUA_STRLIBNAME, luaopen_string},
+        {LUA_MATHLIBNAME, luaopen_math},
+        {LUA_UTF8LIBNAME, luaopen_utf8},
+        {LUA_COLIBNAME, luaopen_coroutine},
+        {LUA_OSLIBNAME, luaopen_os},
+        {nullptr, nullptr}
+    };
+
+    for (const luaL_Reg* lib = safe_libs; lib->func != nullptr; lib++) {
+        luaL_requiref(L, lib->name, lib->func, 1);
+        lua_pop(L, 1);
+    }
+
+    // Sanear estrictamente la tabla global 'os' dejando únicamente funciones seguras de fecha y hora
+    lua_getglobal(L, "os");
+    if (lua_istable(L, -1)) {
+        // Bloquear llamadas al sistema operativo y manipulación del sistema de archivos
+        const char* dangerous_os_funcs[] = {
+            "execute", "exit", "getenv", "remove", "rename", "setlocale", "tmpname", nullptr
+        };
+        for (int i = 0; dangerous_os_funcs[i] != nullptr; i++) {
+            lua_pushnil(L);
+            lua_setfield(L, -2, dangerous_os_funcs[i]);
+        }
+    }
+    lua_pop(L, 1);
+
+    // Purgar de _G cualquier vector residual de ejecución arbitraria de archivos o código dinámico
+    lua_pushnil(L);
+    lua_setglobal(L, "dofile");
+    lua_pushnil(L);
+    lua_setglobal(L, "loadfile");
+    lua_pushnil(L);
+    lua_setglobal(L, "load");
+}
+
 // Hook de seguridad de Lua para prevenir bucles infinitos y bloqueos en el hilo principal (ANR).
 // Interrumpe la ejecución de forma segura mediante luaL_error si el script excede 100,000 instrucciones.
 static void lua_timeout_instruction_hook(lua_State* L, lua_Debug* /* ar */) {
@@ -76,7 +126,8 @@ Java_com_example_native_NativeEngine_executeLua(
         return env->NewStringUTF("Error: No se pudo inicializar el estado de Lua en C");
     }
 
-    luaL_openlibs(L);
+    // Inicializar sandbox seguro sin librerías de sistema operativo ni entrada/salida
+    init_lua_safe_sandbox(L);
 
     // Protección nativa contra bucles infinitos: hook de conteo que aborta de forma segura
     lua_sethook(L, lua_timeout_instruction_hook, LUA_MASKCOUNT, 100000);
@@ -125,7 +176,8 @@ Java_com_example_native_NativeEngine_executeLuaWithContext(
         return env->NewStringUTF("Error: No se pudo inicializar el estado de Lua en C");
     }
 
-    luaL_openlibs(L);
+    // Inicializar sandbox seguro sin librerías de sistema operativo ni entrada/salida
+    init_lua_safe_sandbox(L);
 
     // Protección nativa contra bucles infinitos: hook de conteo que aborta de forma segura
     lua_sethook(L, lua_timeout_instruction_hook, LUA_MASKCOUNT, 100000);

@@ -239,7 +239,8 @@ class NotesViewModel(
 
     /**
      * Bloquea manualmente o por expiración de inactividad la nota cifrada activa:
-     * Cifra el contenido con AES-256 en Rust, persiste en Room y purga de inmediato
+     * Cifra el contenido con AES-256 en Rust, persiste en Room, cierra la nota activa
+     * en la interfaz para no exponer texto plano ni payloads cifrados y purga de inmediato
      * la contraseña de la memoria RAM para máxima seguridad.
      */
     fun lockActiveNoteSession() {
@@ -248,6 +249,7 @@ class NotesViewModel(
         val current = _activeNote.value
         val sessionPassword = activeNoteSessionPassword
         activeNoteSessionPassword = null
+        _activeNote.value = null
 
         if (current != null && current.isEncrypted && !sessionPassword.isNullOrEmpty()) {
             saveJob?.cancel()
@@ -255,9 +257,6 @@ class NotesViewModel(
                 val encrypted = NativeEngine.encryptNote(current.content, sessionPassword)
                 val updated = current.copy(content = encrypted)
                 repository.update(updated)
-                withContext(Dispatchers.Main) {
-                    _activeNote.value = updated
-                }
             }
         }
     }

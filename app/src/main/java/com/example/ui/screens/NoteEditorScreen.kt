@@ -182,8 +182,14 @@ fun NoteEditorScreen(
     }
 
     // Sync content if changed externally (e.g., from toggling tasks in preview)
+    // Coacciona la selección dentro de los límites válidos del nuevo texto para evitar IndexOutOfBoundsException
     if (contentFieldValue.text != note.content) {
-        contentFieldValue = contentFieldValue.copy(text = note.content)
+        val safeStart = contentFieldValue.selection.start.coerceIn(0, note.content.length)
+        val safeEnd = contentFieldValue.selection.end.coerceIn(0, note.content.length)
+        contentFieldValue = contentFieldValue.copy(
+            text = note.content,
+            selection = TextRange(safeStart, safeEnd)
+        )
     }
 
     // Auto-scroll towards cursor when typing, changing selection, or opening keyboard
@@ -418,8 +424,8 @@ fun NoteEditorScreen(
                     onInsertText = { prefix, suffix ->
                         val text = contentFieldValue.text
                         val selection = contentFieldValue.selection
-                        val start = selection.start
-                        val end = selection.end
+                        val start = selection.min.coerceIn(0, text.length)
+                        val end = selection.max.coerceIn(0, text.length)
                         val selectedText = text.substring(start, end)
 
                         val newText = text.substring(0, start) + prefix + selectedText + suffix + text.substring(end)
@@ -733,10 +739,11 @@ fun NoteEditorScreen(
     if (showFontDialog) {
         val selection = contentFieldValue.selection
         val hasSelection = selection.start != selection.end
-        val selectedSnippet = if (hasSelection) {
-            val s = selection.start
-            val e = selection.end
-            val sub = contentFieldValue.text.substring(s, e)
+        val text = contentFieldValue.text
+        val s = selection.min.coerceIn(0, text.length)
+        val e = selection.max.coerceIn(0, text.length)
+        val selectedSnippet = if (hasSelection && s < e) {
+            val sub = text.substring(s, e)
             if (sub.length > 25) sub.take(25) + "…" else sub
         } else ""
 
@@ -748,14 +755,14 @@ fun NoteEditorScreen(
                 onNoteFontChange(newFont.id)
             },
             onApplyToSelection = { newFont ->
-                val text = contentFieldValue.text
+                val currentText = contentFieldValue.text
                 val sel = contentFieldValue.selection
-                val start = sel.start
-                val end = sel.end
+                val start = sel.min.coerceIn(0, currentText.length)
+                val end = sel.max.coerceIn(0, currentText.length)
                 val prefix = "[font:${newFont.id}]"
                 val suffix = "[/font]"
-                val textToWrap = if (start != end) text.substring(start, end) else "texto"
-                val newText = text.substring(0, start) + prefix + textToWrap + suffix + text.substring(end)
+                val textToWrap = if (start < end) currentText.substring(start, end) else "texto"
+                val newText = currentText.substring(0, start) + prefix + textToWrap + suffix + currentText.substring(end)
                 val newCursorPos = start + prefix.length + textToWrap.length + suffix.length
 
                 contentFieldValue = TextFieldValue(
@@ -892,10 +899,10 @@ fun NoteEditorScreen(
             onApplyResult = { generatedText, insertMode ->
                 val text = contentFieldValue.text
                 val selection = contentFieldValue.selection
+                val start = selection.min.coerceIn(0, text.length)
+                val end = selection.max.coerceIn(0, text.length)
                 val newText = when (insertMode) {
                     LuaInsertMode.CURSOR -> {
-                        val start = selection.start
-                        val end = selection.end
                         text.substring(0, start) + generatedText + text.substring(end)
                     }
                     LuaInsertMode.APPEND -> {
@@ -906,7 +913,7 @@ fun NoteEditorScreen(
                     }
                 }
                 val newCursorPos = when (insertMode) {
-                    LuaInsertMode.CURSOR -> selection.start + generatedText.length
+                    LuaInsertMode.CURSOR -> start + generatedText.length
                     LuaInsertMode.APPEND, LuaInsertMode.REPLACE -> newText.length
                 }
                 contentFieldValue = TextFieldValue(

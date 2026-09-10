@@ -1,44 +1,46 @@
-fix(markdown): corregir espaciado de parrafos y preservacion de lineas vacias
+sec(vault): remediacion integral de seguridad, criptografia real aes-256-ctr, sandbox lua y blindaje de datos locales
 
-- Parser de Markdown (`app/src/main/java/com/example/ui/markdown/MarkdownParser.kt`):
-  * Añadido bloque `MarkdownBlock.BlankLine` para registrar y preservar líneas en blanco en lugar de descartarlas en el recorrido.
-  * Agrupación natural de líneas consecutivas de texto en bloques `Paragraph` multilínea para respetar saltos de línea suaves (`\n`) dentro del mismo párrafo.
-  * Implementada función de detección de bloques especiales (`isSpecialBlockStart`) para evitar fragmentaciones accidentales en encabezados, citas, listas y bloques de código.
+- Criptografía Auténtica Grado Militar e Interoperabilidad Rust / C Core (`app/src/main/rust/src/lib.rs` & `rust_shim.c`):
+  * Eliminado el cifrador XOR y generación determinista de sal/IV en `lib.rs`.
+  * Implementado algoritmo AES-256 en modo CTR con tablas oficiales de sustitución FIPS-197 y expansión de 14 rondas de clave.
+  * Incorporada derivación de claves PBKDF2-HMAC-SHA256 (10,000 iteraciones) para derivar 64 bytes (32 bytes para clave AES y 32 bytes para autenticación HMAC).
+  * Generación de sal (16 bytes) y vector de inicialización IV (16 bytes) utilizando CSPRNG criptográficamente seguro leyendo `/dev/urandom`.
+  * Esquema Encrypt-then-MAC (HMAC-SHA256) sobre `salt || iv || ciphertext` con verificación de autenticidad en tiempo constante (protección estricta contra ataques de temporización/canal lateral).
+  * Unificación al 100% del formato binario y de texto `VAULT_ENC_V1$<salt_hex>$<iv_hex>$<cipher_hex>$<mac_hex>` entre el motor Rust (`lib.rs`) y la implementación shim de C (`rust_shim.c`), previniendo pérdida irreparable de datos.
 
-- Renderizador de Markdown (`app/src/main/java/com/example/ui/markdown/MarkdownRenderer.kt`):
-  * Creado componente composable `RenderBlankLine` con espaciado vertical proporcional (`Spacer` de 14.dp), reflejando con exactitud los saltos de línea y separaciones intencionales entre párrafos.
-  * Ajustado el espaciado vertical entre bloques en `MarkdownPreview` a 6.dp para un balance óptimo entre elementos compactos y párrafos diferenciados.
-  * Robustecida la lógica de formato en línea (`formatInlineMarkdown`) para manejar asteriscos múltiples iniciales (`****`) y líneas con formato en negrita sin delimitador de cierre en entornos móviles.
+- Mitigación de Ejecución Remota de Código (RCE) y Sandbox Estricto en Lua 5.4 (`app/src/main/cpp/native-bridge.cpp` & `AppUpdateManager.kt`):
+  * Reemplazado `luaL_openlibs(L)` en el puente JNI de C++ por inicializador seguro `init_lua_safe_sandbox(L)`, aislando el runtime de Lua.
+  * Omitidas deliberadamente las librerías `io` (acceso a disco/almacenamiento), `os` (llamadas a consola/shell), `package` (carga de binarios) y `debug` (escape de memoria).
+  * Anuladas del entorno global de Lua las funciones de carga dinámica de scripts `dofile`, `loadfile` y `load`.
+  * Mantenido el hook de control nativo `lua_timeout_instruction_hook` limitado a 100,000 instrucciones para evitar bloqueos del hilo principal (ANR) y denegaciones de servicio (DoS).
+  * Descartada la descarga y ejecución de scripts Lua remotos sin firma desde URLs dinámicas en `AppUpdateManager.kt`, restringiendo la ejecución exclusivamente a `assets/updater_config.lua` auditado e integrado en el APK.
+  * Sanitizadas las variables inyectadas (`tagName`) para impedir la inyección arbitraria de código o comillas no controladas en llamadas Lua.
 
-- Pruebas unitarias (`app/src/test/java/com/example/ExampleRobolectricTest.kt`):
-  * Añadido test unitario verificando que `MarkdownParser.parse` preserva fielmente las líneas vacías y secuencias de párrafos múltiples.
+- Preservación y Protección de Base de Datos Local Room (`app/src/main/java/com/example/data/local/AppDatabase.kt`):
+  * Eliminada la directiva destructiva `.fallbackToDestructiveMigration()` de la construcción de `AppDatabase`.
+  * Garantizada la permanencia absoluta e integridad de las notas locales del usuario ante cualquier actualización futura o cambio de versión de esquema.
 
-perf(cache): configuracion inteligente multinivel de cache en disco, cpu, criptografia y base de datos
+- Alerta y Transparencia en Configuración de Firmas Release (`app/build.gradle.kts`):
+  * Incorporada advertencia explícita en el pipeline de Gradle para prevenir la distribución accidental de compilaciones Release firmadas con `debug.keystore` en ausencia de credenciales de producción.
 
-- Caché de Disco para Descargas de APKs (`app/src/main/java/com/example/updater/AppUpdateManager.kt`):
-  * Implementadas rutinas proactivas de saneamiento (`cleanInstalledOrStaleApks` y `purgeUpdatesCache`) que eliminan instaladores antiguos, descargas residuales (.apk/.tmp) y versiones obsoletas o ya instaladas en el almacenamiento antes de iniciar nuevas comprobaciones o descargas.
+- Privacidad y Blindaje contra Extracción de Datos Locales (`app/src/main/AndroidManifest.xml`):
+  * Cambiado `android:allowBackup="true"` a `android:allowBackup="false"`, bloqueando la extracción de la base de datos de SQLite, cachés y notas privadas a través de copias de seguridad adb o nube no cifrada.
 
-- Caché de CPU para Renderizado de Markdown (`MarkdownParser.kt` & `MarkdownRenderer.kt`):
-  * Incorporada caché LRU en memoria (`parsedBlocksCache`) en `MarkdownParser` para almacenar árboles de bloques sintácticos según el hash del contenido, eliminando recalculaciones redundantes de regex durante recomposiciones y alternancias entre vista previa y edición.
-  * Añadida caché LRU estática (`inlineMarkdownCache`) en `MarkdownRenderer` para `AnnotatedString` con estilos de texto en línea (negritas, cursivas, código y fuentes), reduciendo drásticamente el trabajo del recolector de basura (GC) y manteniendo 60/120 FPS al hacer scroll en notas extensas.
+- Seguridad de Memoria contra Zip-Bombs y Zip-Slip (`app/src/main/java/com/example/data/util/VaultPackageHelper.kt`):
+  * Implementado límite de lectura en buffer por entrada (10 MB máximo) y tope global por paquete ZIP (25 MB máximo) en `readStreamToString` e `importZipPackage` para evitar `OutOfMemoryError` y ataques de descompresión maliciosos.
+  * Establecido límite de un máximo de 50 entradas por paquete ZIP y validación de nombres de ruta para neutralizar vectores de ataque Zip-Slip (`../`).
 
-- Caché de Seguridad y Criptografía (`NativeEngine.kt` & `NotesViewModel.kt`):
-  * Implementada sesión criptográfica en memoria volátil con TTL (Time-To-Live) de 5 minutos de inactividad (`cryptoSessionTimeoutJob`), refrescada con cada interacción del usuario y bloqueada automáticamente para purgar claves de la memoria RAM.
-  * Creada función `lockActiveNoteSession` para re-cifrar de inmediato en Rust (AES-256) y desechar contraseñas en memoria al suspender o cerrar notas.
+- Resiliencia Táctil y Protección contra Excepciones en Editor (`app/src/main/java/com/example/ui/screens/NoteEditorScreen.kt`):
+  * Neutralizado cuelgue crítico (`StringIndexOutOfBoundsException`) al formatear texto con selección invertida (arrastre táctil de derecha a izquierda) usando `selection.min` y `selection.max` coaccionados dentro de los límites del texto en la barra Markdown, selector de fuentes y diálogos de Lua.
+  * Eliminado riesgo de `IndexOutOfBoundsException` en `contentFieldValue` durante la sincronización reactiva de contenido externo coaccionando los rangos del cursor con `coerceIn(0, note.content.length)`.
 
-- Caché de Búsqueda y Lectura de Datos (`NoteRepository.kt` & `NotesViewModel.kt`):
-  * Añadida caché LRU de notas de primer nivel en `NoteRepository` para servir consultas frecuentes de notas individuales sin someter a SQLite a lecturas de disco innecesarias.
-  * Implementada caché LRU de consultas de búsqueda (`searchCache`) en `NotesViewModel` indexada por consulta, etiqueta y estado de la colección, evitando re-ejecutar bucles de coincidencia JNI con Rust de forma redundante.
-  * Ciclo de vida optimizado en `onCleared` para liberar la totalidad de cachés y referencias sensibles de la memoria RAM.
+- Habilitación Segura de Funciones Temporales en Sandbox Lua 5.4 (`app/src/main/cpp/native-bridge.cpp`):
+  * Solucionado el fallo en la plantilla diaria (`attempt to index a nil value (global 'os')`) exponiendo la tabla `os` con funciones puras de fecha y hora (`date`, `time`, `clock`, `difftime`).
+  * Mantenido el bloqueo estricto contra llamadas a consola del sistema y ficheros (`execute`, `exit`, `getenv`, `remove`, `rename`, `setlocale`, `tmpname`).
 
-fix(native-bridge): correccion de asignadores de memoria cruzada e integracion autentica de firmas en rust
+- Blindaje de Privacidad ante Expiración de Sesión Criptográfica (`app/src/main/java/com/example/ui/viewmodel/NotesViewModel.kt`):
+  * Corregida exposición del payload cifrado `VAULT_ENC_V1$...` al expirar la sesión por inactividad (TTL 5 min): se establece `_activeNote.value = null` para cerrar el editor y retornar de inmediato a la lista protegida de notas en lugar de dejar el texto cifrado visible en pantalla.
 
-- Desasignación de Memoria y Prevención de Corrupción de Heap (`app/src/main/cpp/native-bridge.cpp`):
-  * Corregido fallo crítico de conflicto de asignadores (Heap Allocator Mismatch): reemplazadas las llamadas erróneas a `free()` por `rust_core_free_string()` en `encryptNoteInRust` y `decryptNoteInRust`.
-  * La memoria reservada por Rust con `CString::into_raw()` ahora es devuelta y liberada con seguridad por el propio runtime de Rust (`CString::from_raw`), previniendo caídas catastróficas (`SIGSEGV` / `SIGABRT`) y fugas de memoria en arquitecturas móviles de 32 y 64 bits.
-
-- Unificación e Integración Criptográfica Auténtica de Firmas en Rust (`app/src/main/cpp/native-bridge.cpp`, `rust_shim.c` y `lib.rs`):
-  * Corregida la inconsistencia arquitectónica en `generateVaultSignatureInRust` y `verifyVaultSignatureInRust`: eliminado el duplicado estático en C++ y delegada la generación y verificación de firmas directamente a las funciones de Rust (`rust_generate_vault_signature` y `rust_verify_vault_signature`).
-  * Implementadas las funciones correspondientes en `rust_shim.c` para paridad completa con el motor Rust.
-  * La verificación criptográfica ahora se ejecuta auténticamente en Rust con comparación en tiempo constante (protección contra ataques de canal lateral/timing attacks).
-
+- Corrección de Discrepancias en Documentación Técnica (`AI_CONTEXT.md` & `Changelog-beta.md`):
+  * Corregido `Target SDK` en `Changelog-beta.md` a Android 16 (API 36).
+  * Sincronizado el identificador de aplicación base a `com.keeppr` (`com.keeppr.beta` en release / `com.keeppr.dev` en canary) y actualizada la especificación del motor criptográfico a AES-256-CTR con PBKDF2-HMAC-SHA256 en `AI_CONTEXT.md`.

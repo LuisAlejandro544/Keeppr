@@ -39,7 +39,8 @@ abstract class AppDatabase : RoomDatabase() {
                     "vault_notes_database"
                 )
                     .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
-                    .fallbackToDestructiveMigration()
+                    // Eliminado fallbackToDestructiveMigration para garantizar que jamás se borren
+                    // los datos ni notas locales del usuario ante inconsistencias de versión.
                     .addCallback(DatabaseCallback())
                     .build()
                 INSTANCE = instance

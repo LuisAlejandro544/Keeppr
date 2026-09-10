@@ -75,14 +75,17 @@ class AppUpdateManager(private val context: Context) {
     private var activeLuaScript: String? = null
 
     /**
-     * Carga el script de Lua desde assets locales o descarga la versión más reciente
-     * desde GitHub Raw para aplicar cambios dinámicos sin recompilar.
+     * Carga el script de Lua exclusivamente desde assets locales empaquetados en el APK.
+     * Explicación de la lógica:
+     * Por directrices estrictas de seguridad (prevención de RCE), se bloquea la descarga
+     * de scripts Lua remotos sin firma desde GitHub Raw. Se utiliza exclusivamente el script
+     * auditado integrado en assets/updater_config.lua.
      */
     private suspend fun obtainLuaScript(): String = withContext(Dispatchers.IO) {
         // 1. Si ya se cargó en memoria, reutilizar
         activeLuaScript?.let { return@withContext it }
 
-        // 2. Cargar primero el script base empaquetado en assets
+        // 2. Cargar el script empaquetado y auditado en assets
         var scriptContent = ""
         try {
             context.assets.open("updater_config.lua").use { inputStream ->
@@ -90,27 +93,6 @@ class AppUpdateManager(private val context: Context) {
             }
         } catch (e: Exception) {
             Log.w(tag, "No se pudo leer assets/updater_config.lua local: ${e.message}")
-        }
-
-        // 3. Intentar consultar la versión más reciente en GitHub Raw para obtener URLs dinámicas
-        try {
-            val rawUrl = "https://raw.githubusercontent.com/LuisAlejandro544/Keeppr/main/updater_config.lua"
-            val request = Request.Builder()
-                .url(rawUrl)
-                .addHeader("User-Agent", "Keeppr-Android-App")
-                .build()
-
-            httpClient.newCall(request).execute().use { response ->
-                if (response.isSuccessful) {
-                    val remoteContent = response.body?.string()
-                    if (!remoteContent.isNullOrBlank() && remoteContent.contains("UpdaterConfig")) {
-                        Log.i(tag, "Configuración Lua remota de GitHub Raw cargada exitosamente.")
-                        scriptContent = remoteContent
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            Log.d(tag, "Uso de script Lua local (sin conexión a GitHub Raw): ${e.message}")
         }
 
         activeLuaScript = scriptContent
@@ -182,8 +164,9 @@ class AppUpdateManager(private val context: Context) {
 
                 if (isDraft) continue
 
-                // Ejecutar filtro lógico de Lua nativo: debe ser pre-release y contener '-b'
-                val luaFilterCall = "$luaScript\nreturn tostring(UpdaterConfig.filter_beta_release(\"$tagName\", $isPrerelease))"
+                // Sanitizar tagName para prevenir inyección de código en Lua
+                val safeTagName = tagName.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "").replace("\r", "")
+                val luaFilterCall = "$luaScript\nreturn tostring(UpdaterConfig.filter_beta_release(\"$safeTagName\", $isPrerelease))"
                 val luaFilterResult = NativeEngine.evalLua(luaFilterCall).trim()
 
                 val isBetaEligible = luaFilterResult.equals("true", ignoreCase = true) ||

@@ -81,7 +81,7 @@ Keeppr es una aplicación móvil de notas personales de alto rendimiento, diseñ
 * **Versión de Debug (Desarrollo):** `v0.1.0-dev`
 * **Versión Estable:** Planificada para publicación oficial tras completar las fases de prueba comunitaria.
 * **Código de versión:** `1`
-* **Target SDK:** Android 14 (API 36)
+* **Target SDK:** Android 16 (API 36)
 * **Min SDK:** Android 8.0 Oreo (API 26)
 * **Arquitecturas del APK Beta:** `arm64-v8a` (64 bits) y `armeabi-v7a` (32 bits / Android Go). Emuladores de PC (`x86_64` y `x86`) descartados.
 * **Canal de distribución previsto:** Uptodown / Instalación directa vía APK independiente (100% offline, sin Google Play Services).

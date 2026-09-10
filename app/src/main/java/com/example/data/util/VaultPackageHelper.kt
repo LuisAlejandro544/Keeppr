@@ -23,6 +23,9 @@ import java.util.zip.ZipOutputStream
 object VaultPackageHelper {
     private const val TAG = "VaultPackageHelper"
     private const val VAULT_SEPARATOR = "\n---VAULT_SEPARATOR---\n"
+    private const val MAX_ENTRY_BYTES = 10 * 1024 * 1024 // 10 MB máximo por archivo
+    private const val MAX_TOTAL_BYTES = 25 * 1024 * 1024 // 25 MB máximo por archivo ZIP
+    private const val MAX_ZIP_ENTRIES = 50 // Máximo 50 entradas por archivo ZIP
 
     sealed class ImportResult {
         data class Success(val note: Note, val isAuthenticVault: Boolean, val message: String) : ImportResult()
@@ -128,28 +131,52 @@ object VaultPackageHelper {
         var noteContent: String? = null
         var metaJsonStr: String? = null
         var signatureStr: String? = null
+        var totalBytesRead = 0L
+        var entriesCount = 0
 
         context.contentResolver.openInputStream(uri)?.use { inputStream ->
             ZipInputStream(inputStream).use { zis ->
                 var entry: ZipEntry? = zis.nextEntry
                 while (entry != null) {
-                    when (entry.name) {
+                    entriesCount++
+                    if (entriesCount > MAX_ZIP_ENTRIES) {
+                        return ImportResult.Error("El archivo ZIP contiene demasiadas entradas (máximo $MAX_ZIP_ENTRIES).")
+                    }
+
+                    // Prevenir ataque Zip-Slip con nombres de ruta maliciosos
+                    val cleanName = entry.name.replace("\\", "/").trim()
+                    if (cleanName.contains("../") || cleanName.startsWith("/")) {
+                        zis.closeEntry()
+                        entry = zis.nextEntry
+                        continue
+                    }
+
+                    when (cleanName) {
                         "note.md", "nota.md", "content.md" -> {
-                            noteContent = readStreamToString(zis)
+                            noteContent = readStreamToString(zis, MAX_ENTRY_BYTES)
+                            totalBytesRead += noteContent?.length?.toLong() ?: 0L
                         }
                         "vault_meta.json", "metadata.json" -> {
-                            metaJsonStr = readStreamToString(zis)
+                            metaJsonStr = readStreamToString(zis, MAX_ENTRY_BYTES)
+                            totalBytesRead += metaJsonStr?.length?.toLong() ?: 0L
                         }
                         "signature.vault", "vault_signature.txt" -> {
-                            signatureStr = readStreamToString(zis).trim()
+                            signatureStr = readStreamToString(zis, MAX_ENTRY_BYTES).trim()
+                            totalBytesRead += signatureStr?.length?.toLong() ?: 0L
                         }
                         else -> {
                             // Si contiene un archivo de texto cualquiera y aún no tenemos contenido
-                            if (noteContent == null && (entry.name.endsWith(".md") || entry.name.endsWith(".txt"))) {
-                                noteContent = readStreamToString(zis)
+                            if (noteContent == null && (cleanName.endsWith(".md") || cleanName.endsWith(".txt"))) {
+                                noteContent = readStreamToString(zis, MAX_ENTRY_BYTES)
+                                totalBytesRead += noteContent?.length?.toLong() ?: 0L
                             }
                         }
                     }
+
+                    if (totalBytesRead > MAX_TOTAL_BYTES) {
+                        return ImportResult.Error("El tamaño descomprimido del paquete excede el límite de seguridad (25 MB).")
+                    }
+
                     zis.closeEntry()
                     entry = zis.nextEntry
                 }
@@ -274,12 +301,24 @@ object VaultPackageHelper {
         }
     }
 
-    private fun readStreamToString(inputStream: InputStream): String {
+    private fun readStreamToString(inputStream: InputStream, maxBytes: Int = MAX_ENTRY_BYTES): String {
         val baos = ByteArrayOutputStream()
         val buffer = ByteArray(4096)
         var length: Int
+        var total = 0
         while (inputStream.read(buffer).also { length = it } != -1) {
-            baos.write(buffer, 0, length)
+            val toWrite = if (total + length > maxBytes) {
+                maxBytes - total
+            } else {
+                length
+            }
+            if (toWrite > 0) {
+                baos.write(buffer, 0, toWrite)
+                total += toWrite
+            }
+            if (total >= maxBytes) {
+                break
+            }
         }
         return baos.toString(StandardCharsets.UTF_8.name())
     }
