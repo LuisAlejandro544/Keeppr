@@ -84,7 +84,7 @@ fun MarkdownPreview(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 4.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         if (blocks.isEmpty()) {
             Text(
@@ -106,6 +106,7 @@ fun MarkdownPreview(
                 is MarkdownBlock.CodeBlock -> RenderCodeBlock(block)
                 is MarkdownBlock.Divider -> RenderDivider()
                 is MarkdownBlock.Paragraph -> RenderParagraph(block, baseFontFamily)
+                is MarkdownBlock.BlankLine -> RenderBlankLine()
             }
         }
     }
@@ -451,6 +452,18 @@ private fun RenderParagraph(paragraph: MarkdownBlock.Paragraph, baseFontFamily: 
 }
 
 /**
+ * Renderiza una línea en blanco con altura vertical proporcional para espaciar párrafos.
+ */
+@Composable
+private fun RenderBlankLine() {
+    Spacer(modifier = Modifier.height(14.dp))
+}
+
+// Caché LRU estática en memoria RAM para textos inline ya anotados (máximo 150 elementos).
+// Reduce drásticamente el coste del bucle de formato y la presión sobre el recolector de basura (GC).
+private val inlineMarkdownCache = android.util.LruCache<Int, AnnotatedString>(150)
+
+/**
  * Parses inline markdown: **bold**, *italic*, `code`, ~~strike~~, [font:id]...[/font], #tags
  */
 @Composable
@@ -460,7 +473,10 @@ fun formatInlineMarkdown(rawText: String): AnnotatedString {
     val codeTextColor = MaterialTheme.colorScheme.onSurfaceVariant
 
     return remember(rawText, primaryColor, codeBgColor) {
-        buildAnnotatedString {
+        val cacheKey = 31 * (31 * rawText.hashCode() + primaryColor.hashCode()) + codeBgColor.hashCode()
+        inlineMarkdownCache.get(cacheKey)?.let { return@remember it }
+
+        val parsed = buildAnnotatedString {
             var i = 0
             val len = rawText.length
 
@@ -501,14 +517,55 @@ fun formatInlineMarkdown(rawText: String): AnnotatedString {
                         i = end + 1
                     }
 
-                    // Bold **text**
-                    rawText.startsWith("**", i) && rawText.indexOf("**", i + 2) != -1 -> {
-                        val end = rawText.indexOf("**", i + 2)
-                        val boldText = rawText.substring(i + 2, end)
-                        pushStyle(SpanStyle(fontWeight = FontWeight.Bold))
-                        append(boldText)
-                        pop()
-                        i = end + 2
+                    // Bold **text** or unclosed leading **line or ****emphasis
+                    rawText.startsWith("**", i) -> {
+                        var asterisksCount = 0
+                        while (i + asterisksCount < len && rawText[i + asterisksCount] == '*') {
+                            asterisksCount++
+                        }
+                        if (asterisksCount >= 4) {
+                            val innerStart = i + asterisksCount
+                            val end = rawText.indexOf("**", innerStart)
+                            if (end != -1 && end > innerStart) {
+                                val boldText = rawText.substring(innerStart, end)
+                                pushStyle(SpanStyle(fontWeight = FontWeight.Bold))
+                                append(boldText)
+                                pop()
+                                var closeCount = 0
+                                while (end + closeCount < len && rawText[end + closeCount] == '*') {
+                                    closeCount++
+                                }
+                                i = end + closeCount
+                            } else {
+                                // Sin cierre explícito: aplicar negrita al resto del texto de la línea
+                                val boldText = rawText.substring(innerStart)
+                                pushStyle(SpanStyle(fontWeight = FontWeight.Bold))
+                                append(boldText)
+                                pop()
+                                i = len
+                            }
+                        } else {
+                            val end = rawText.indexOf("**", i + 2)
+                            if (end != -1 && end > i + 2) {
+                                val boldText = rawText.substring(i + 2, end)
+                                pushStyle(SpanStyle(fontWeight = FontWeight.Bold))
+                                append(boldText)
+                                pop()
+                                i = end + 2
+                            } else if (end == -1 && (i == 0 || rawText[i - 1] == '\n')) {
+                                // Sin cierre al final de la línea: aplicar negrita al resto de la línea
+                                val nextNewline = rawText.indexOf('\n', i + 2)
+                                val lineEnd = if (nextNewline != -1) nextNewline else len
+                                val boldText = rawText.substring(i + 2, lineEnd)
+                                pushStyle(SpanStyle(fontWeight = FontWeight.Bold))
+                                append(boldText)
+                                pop()
+                                i = lineEnd
+                            } else {
+                                append(rawText[i])
+                                i++
+                            }
+                        }
                     }
 
                     // Strikethrough ~~text~~
@@ -522,13 +579,18 @@ fun formatInlineMarkdown(rawText: String): AnnotatedString {
                     }
 
                     // Italic *text*
-                    rawText[i] == '*' && rawText.indexOf('*', i + 1) != -1 -> {
+                    rawText[i] == '*' -> {
                         val end = rawText.indexOf('*', i + 1)
-                        val italicText = rawText.substring(i + 1, end)
-                        pushStyle(SpanStyle(fontStyle = FontStyle.Italic))
-                        append(italicText)
-                        pop()
-                        i = end + 1
+                        if (end != -1 && end > i + 1 && rawText.getOrNull(end + 1) != '*') {
+                            val italicText = rawText.substring(i + 1, end)
+                            pushStyle(SpanStyle(fontStyle = FontStyle.Italic))
+                            append(italicText)
+                            pop()
+                            i = end + 1
+                        } else {
+                            append(rawText[i])
+                            i++
+                        }
                     }
 
                     // Tag #tag
@@ -556,5 +618,7 @@ fun formatInlineMarkdown(rawText: String): AnnotatedString {
                 }
             }
         }
+        inlineMarkdownCache.put(cacheKey, parsed)
+        parsed
     }
 }

@@ -124,6 +124,9 @@ class AppUpdateManager(private val context: Context) {
     suspend fun checkForUpdates(currentVersion: String) = withContext(Dispatchers.IO) {
         _status.value = UpdateStatus.Checking
 
+        // Limpieza preventiva de APKs antiguos o ya instalados para no malgastar espacio en disco
+        cleanInstalledOrStaleApks(currentVersion)
+
         try {
             val luaScript = obtainLuaScript()
             if (luaScript.isBlank()) {
@@ -242,12 +245,67 @@ class AppUpdateManager(private val context: Context) {
     }
 
     /**
+     * Limpia de forma proactiva archivos APK obsoletos o huérfanos en la caché de disco
+     * para evitar acumulación de memoria basura (archivos de 25-35MB).
+     *
+     * @param preserveFileName Nombre opcional de un APK específico que se desea conservar.
+     */
+    fun purgeUpdatesCache(preserveFileName: String? = null) {
+        try {
+            val updatesDir = File(context.cacheDir, "updates")
+            if (updatesDir.exists() && updatesDir.isDirectory) {
+                updatesDir.listFiles()?.forEach { file ->
+                    if (file.isFile && (preserveFileName == null || file.name != preserveFileName)) {
+                        val deleted = file.delete()
+                        if (deleted) {
+                            Log.d(tag, "Caché de disco liberada: eliminado APK antiguo ${file.name}")
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(tag, "No se pudo purgar la caché de APKs", e)
+        }
+    }
+
+    /**
+     * Elimina automáticamente cualquier APK en caché si su versión es igual o inferior
+     * a la versión actualmente instalada en el dispositivo móvil.
+     */
+    private fun cleanInstalledOrStaleApks(currentVersion: String) {
+        try {
+            val updatesDir = File(context.cacheDir, "updates")
+            if (!updatesDir.exists()) return
+
+            val maxAgeMs = 24 * 60 * 60 * 1000L // 24 horas de expiración para APKs sin instalar
+            val now = System.currentTimeMillis()
+
+            updatesDir.listFiles()?.forEach { file ->
+                if (file.isFile && file.name.endsWith(".apk")) {
+                    val isStale = (now - file.lastModified()) > maxAgeMs
+                    val matchesCurrent = file.name.contains(currentVersion, ignoreCase = true)
+                    if (isStale || matchesCurrent) {
+                        file.delete()
+                        Log.i(tag, "Limpieza automática de caché: eliminado APK ${file.name} (stale=$isStale, current=$matchesCurrent)")
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(tag, "Error en limpieza preventiva de caché APK", e)
+        }
+    }
+
+    /**
      * Descarga el archivo APK directamente en la memoria caché privada de la app
      * reportando el progreso en tiempo real.
+     * Pega antes una purga inteligente para no acumular APKs de versiones pasadas.
      */
     suspend fun downloadApk(releaseInfo: BetaReleaseInfo) = withContext(Dispatchers.IO) {
         try {
             _status.value = UpdateStatus.Downloading(0, 0f, 0f)
+
+            // Purgar de inmediato APKs antiguos antes de comenzar una nueva descarga
+            purgeUpdatesCache(preserveFileName = releaseInfo.apkFileName)
 
             val updatesDir = File(context.cacheDir, "updates")
             if (!updatesDir.exists()) {

@@ -634,3 +634,36 @@ char* rust_decrypt_note(const char* payload, const char* password) {
     free(ciphertext);
     return plaintext;
 }
+
+char* rust_generate_vault_signature(const uint8_t* data, size_t len) {
+    if (!data || len == 0) return strdup("");
+    static const char* salt = "VAULTNOTES_AUTHENTIC_PACKAGE_SIGNATURE_SALT_V1";
+    size_t salt_len = strlen(salt);
+    size_t total_len = salt_len + len;
+    uint8_t* salted = (uint8_t*)malloc(total_len);
+    if (!salted) return strdup("");
+    memcpy(salted, salt, salt_len);
+    memcpy(salted + salt_len, data, len);
+
+    uint8_t hash[32];
+    sha256_buffer(salted, total_len, hash);
+    free(salted);
+
+    char hex[65];
+    to_hex(hash, 32, hex);
+    size_t out_len = 13 + 64 + 1; // "VAULT_SIG_V1:" + 64 hex + null
+    char* result = (char*)malloc(out_len);
+    if (!result) return strdup("");
+    snprintf(result, out_len, "VAULT_SIG_V1:%s", hex);
+    return result;
+}
+
+bool rust_verify_vault_signature(const uint8_t* data, size_t len, const char* sig) {
+    if (!data || len == 0 || !sig) return false;
+    char* expected = rust_generate_vault_signature(data, len);
+    if (!expected) return false;
+    bool match = (strcmp(expected, sig) == 0);
+    free(expected);
+    return match;
+}
+

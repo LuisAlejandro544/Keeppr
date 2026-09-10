@@ -185,6 +185,7 @@ val cargoBuild = tasks.register("cargoBuild") {
   val rustDir = file("src/main/rust")
   inputs.dir(rustDir.resolve("src"))
   inputs.file(rustDir.resolve("Cargo.toml"))
+  inputs.file(rustDir.resolve("rust_shim.c"))
   outputs.dir(rustDir.resolve("target"))
 
   doLast {

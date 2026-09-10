@@ -18,6 +18,7 @@ import com.example.updater.AppUpdateManager
 import com.example.updater.BetaReleaseInfo
 import com.example.updater.UpdateStatus
 import java.io.File
+import android.util.LruCache
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -29,6 +30,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 enum class EditorMode {
     EDIT,
@@ -144,6 +146,14 @@ class NotesViewModel(
     // Contraseña en memoria para la sesión activa de la nota abierta
     private var activeNoteSessionPassword: String? = null
 
+    // Temporizador de expiración de sesión criptográfica (TTL: 5 minutos de inactividad)
+    private var cryptoSessionTimeoutJob: Job? = null
+    private val cryptoSessionTtlMs = 5 * 60 * 1000L
+
+    // Caché LRU en memoria RAM de resultados de búsqueda filtrados (máx 25 consultas recientes).
+    // Evita reprocesar coincidencias JNI con Rust al escribir, borrar caracteres o reabrir la app.
+    private val searchCache = LruCache<String, List<Note>>(25)
+
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
@@ -169,8 +179,8 @@ class NotesViewModel(
 
     /**
      * Lista reactiva de notas filtradas, calculada en un hilo de fondo (Dispatchers.Default)
-     * utilizando el motor de búsqueda nativo en Rust para acelerar coincidencias en títulos,
-     * contenido y etiquetas sin bloquear la interfaz de usuario.
+     * utilizando una caché LRU de consultas y el motor de búsqueda nativo en Rust para acelerar
+     * coincidencias en títulos, contenido y etiquetas sin sobrecargar el recolector de basura.
      */
     val filteredNotes: StateFlow<List<Note>> = combine(
         repository.allNotes,
@@ -181,7 +191,10 @@ class NotesViewModel(
         if (q.isBlank() && tag == null) {
             notes
         } else {
-            notes.filter { note ->
+            val cacheKey = "$q|$tag|${notes.hashCode()}"
+            searchCache.get(cacheKey)?.let { return@combine it }
+
+            val filtered = notes.filter { note ->
                 // Si la nota está cifrada, comparamos solo en título y etiquetas para no comparar con el payload cifrado
                 val matchesQuery = q.isBlank() || if (note.isEncrypted) {
                     NativeEngine.matchNote(
@@ -203,10 +216,51 @@ class NotesViewModel(
 
                 matchesQuery && matchesTag
             }
+            searchCache.put(cacheKey, filtered)
+            filtered
         }
     }
     .flowOn(Dispatchers.Default)
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /**
+     * Refresca la sesión activa de la nota protegida en memoria.
+     * Si pasan 5 minutos sin actividad del usuario, bloquea la nota y elimina la clave de la RAM.
+     */
+    private fun touchCryptoSession() {
+        cryptoSessionTimeoutJob?.cancel()
+        if (activeNoteSessionPassword != null) {
+            cryptoSessionTimeoutJob = viewModelScope.launch {
+                delay(cryptoSessionTtlMs)
+                lockActiveNoteSession()
+            }
+        }
+    }
+
+    /**
+     * Bloquea manualmente o por expiración de inactividad la nota cifrada activa:
+     * Cifra el contenido con AES-256 en Rust, persiste en Room y purga de inmediato
+     * la contraseña de la memoria RAM para máxima seguridad.
+     */
+    fun lockActiveNoteSession() {
+        cryptoSessionTimeoutJob?.cancel()
+        cryptoSessionTimeoutJob = null
+        val current = _activeNote.value
+        val sessionPassword = activeNoteSessionPassword
+        activeNoteSessionPassword = null
+
+        if (current != null && current.isEncrypted && !sessionPassword.isNullOrEmpty()) {
+            saveJob?.cancel()
+            viewModelScope.launch(Dispatchers.IO) {
+                val encrypted = NativeEngine.encryptNote(current.content, sessionPassword)
+                val updated = current.copy(content = encrypted)
+                repository.update(updated)
+                withContext(Dispatchers.Main) {
+                    _activeNote.value = updated
+                }
+            }
+        }
+    }
 
     fun onSearchQueryChange(query: String) {
         _searchQuery.value = query
@@ -221,6 +275,8 @@ class NotesViewModel(
     }
 
     fun openNote(note: Note, initialMode: EditorMode = EditorMode.EDIT) {
+        cryptoSessionTimeoutJob?.cancel()
+        cryptoSessionTimeoutJob = null
         activeNoteSessionPassword = null
         _activeNote.value = note
         _editorMode.value = initialMode
@@ -236,6 +292,7 @@ class NotesViewModel(
             activeNoteSessionPassword = password
             _activeNote.value = note.copy(content = decrypted)
             _editorMode.value = EditorMode.EDIT
+            touchCryptoSession()
             true
         } else {
             false
@@ -250,6 +307,7 @@ class NotesViewModel(
         activeNoteSessionPassword = password
         val updated = current.copy(isEncrypted = true, updatedAt = System.currentTimeMillis())
         _activeNote.value = updated
+        touchCryptoSession()
         saveNoteAsync(updated, debounce = false)
     }
 
@@ -258,6 +316,8 @@ class NotesViewModel(
      */
     fun removeActiveNoteEncryption() {
         val current = _activeNote.value ?: return
+        cryptoSessionTimeoutJob?.cancel()
+        cryptoSessionTimeoutJob = null
         activeNoteSessionPassword = null
         val updated = current.copy(isEncrypted = false, updatedAt = System.currentTimeMillis())
         _activeNote.value = updated
@@ -276,6 +336,7 @@ class NotesViewModel(
         viewModelScope.launch {
             val generatedId = repository.insert(newNote)
             val insertedNote = newNote.copy(id = generatedId)
+            searchCache.evictAll()
             _activeNote.value = insertedNote
             _editorMode.value = EditorMode.EDIT
         }
@@ -297,6 +358,7 @@ class NotesViewModel(
         _activeNote.value?.let { current ->
             val updated = current.copy(title = newTitle, updatedAt = System.currentTimeMillis())
             _activeNote.value = updated
+            touchCryptoSession()
             saveNoteAsync(updated, debounce = true)
         }
     }
@@ -305,6 +367,7 @@ class NotesViewModel(
         _activeNote.value?.let { current ->
             val updated = current.copy(content = newContent, updatedAt = System.currentTimeMillis())
             _activeNote.value = updated
+            touchCryptoSession()
             saveNoteAsync(updated, debounce = true)
         }
     }
@@ -321,6 +384,7 @@ class NotesViewModel(
         _activeNote.value?.let { current ->
             val updated = current.copy(tags = newTags, updatedAt = System.currentTimeMillis())
             _activeNote.value = updated
+            touchCryptoSession()
             saveNoteAsync(updated, debounce = true)
         }
     }
@@ -338,6 +402,7 @@ class NotesViewModel(
             val newContent = MarkdownParser.toggleChecklistAt(current.content, lineIndex)
             val updated = current.copy(content = newContent, updatedAt = System.currentTimeMillis())
             _activeNote.value = updated
+            touchCryptoSession()
             saveNoteAsync(updated, debounce = false)
         }
     }
@@ -345,8 +410,12 @@ class NotesViewModel(
     fun deleteActiveNote() {
         _activeNote.value?.let { current ->
             saveJob?.cancel()
+            cryptoSessionTimeoutJob?.cancel()
+            cryptoSessionTimeoutJob = null
+            activeNoteSessionPassword = null
             viewModelScope.launch(Dispatchers.IO) {
                 repository.delete(current)
+                searchCache.evictAll()
                 _activeNote.value = null
             }
         }
@@ -355,7 +424,11 @@ class NotesViewModel(
     fun deleteNote(note: Note) {
         viewModelScope.launch(Dispatchers.IO) {
             repository.delete(note)
+            searchCache.evictAll()
             if (_activeNote.value?.id == note.id) {
+                cryptoSessionTimeoutJob?.cancel()
+                cryptoSessionTimeoutJob = null
+                activeNoteSessionPassword = null
                 _activeNote.value = null
             }
         }
@@ -367,6 +440,8 @@ class NotesViewModel(
      * el estado activo al instante para que la animación de regreso comience en el frame 0.
      */
     fun closeActiveNote() {
+        cryptoSessionTimeoutJob?.cancel()
+        cryptoSessionTimeoutJob = null
         val current = _activeNote.value
         val sessionPassword = activeNoteSessionPassword
         _activeNote.value = null
@@ -381,12 +456,14 @@ class NotesViewModel(
                     current
                 }
                 repository.update(toPersist)
+                searchCache.evictAll()
             }
         }
     }
 
     private fun saveNoteAsync(note: Note, debounce: Boolean = true) {
         saveJob?.cancel()
+        searchCache.evictAll()
         val sessionPassword = activeNoteSessionPassword
         val prepareNoteForPersistence = {
             if (note.isEncrypted && !sessionPassword.isNullOrEmpty()) {
@@ -439,6 +516,17 @@ class NotesViewModel(
      */
     fun exportNoteToVaultZip(context: Context, uri: Uri, note: Note): Boolean {
         return VaultPackageHelper.exportVaultZip(context, uri, note)
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        cryptoSessionTimeoutJob?.cancel()
+        cryptoSessionTimeoutJob = null
+        activeNoteSessionPassword = null
+        searchCache.evictAll()
+        NativeEngine.clearSummaryCache()
+        MarkdownParser.clearCache()
+        repository.clearCache()
     }
 
     class Factory(

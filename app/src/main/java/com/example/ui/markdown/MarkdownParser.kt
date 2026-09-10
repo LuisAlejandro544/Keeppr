@@ -1,5 +1,7 @@
 package com.example.ui.markdown
 
+import android.util.LruCache
+
 sealed class MarkdownBlock {
     data class Header(val level: Int, val text: String, val lineIndex: Int) : MarkdownBlock()
     data class Callout(val type: CalloutType, val title: String, val content: String, val lineIndex: Int) : MarkdownBlock()
@@ -10,6 +12,7 @@ sealed class MarkdownBlock {
     data class CodeBlock(val language: String, val code: String, val lineIndex: Int) : MarkdownBlock()
     data class Divider(val lineIndex: Int) : MarkdownBlock()
     data class Paragraph(val text: String, val lineIndex: Int) : MarkdownBlock()
+    data class BlankLine(val lineIndex: Int) : MarkdownBlock()
 }
 
 enum class CalloutType {
@@ -22,7 +25,26 @@ enum class CalloutType {
 
 object MarkdownParser {
 
+    // Caché LRU de bloques Markdown en memoria RAM (máximo 30 notas o versiones recientes).
+    // Evita recalcular expresiones regulares y recorrido de líneas cuando el usuario alterna
+    // entre el editor y la vista previa, ahorrando batería y ciclos de CPU.
+    private val parsedBlocksCache = LruCache<Int, List<MarkdownBlock>>(30)
+
+    /**
+     * Libera la memoria de la caché de parseo cuando se requiera liberar RAM.
+     */
+    fun clearCache() {
+        parsedBlocksCache.evictAll()
+    }
+
     fun parse(content: String): List<MarkdownBlock> {
+        if (content.isEmpty()) return emptyList()
+
+        val cacheKey = content.hashCode()
+        parsedBlocksCache.get(cacheKey)?.let { cachedBlocks ->
+            return cachedBlocks
+        }
+
         val lines = content.lines()
         val blocks = mutableListOf<MarkdownBlock>()
         var i = 0
@@ -32,8 +54,9 @@ object MarkdownParser {
             val trimmed = line.trim()
 
             when {
-                // Empty line
+                // Empty line: preservar el espacio vertical para que los saltos entre párrafos funcionen fielmente
                 trimmed.isEmpty() -> {
+                    blocks.add(MarkdownBlock.BlankLine(i))
                     i++
                 }
 
@@ -150,14 +173,41 @@ object MarkdownParser {
                     i++
                 }
 
-                // Regular Paragraph
+                // Regular Paragraph: agrupa líneas consecutivas no vacías en un solo bloque con salto natural
                 else -> {
-                    blocks.add(MarkdownBlock.Paragraph(trimmed, i))
-                    i++
+                    val startIndex = i
+                    val paragraphLines = mutableListOf<String>()
+                    while (i < lines.size) {
+                        val currLine = lines[i]
+                        val currTrimmed = currLine.trim()
+                        if (currTrimmed.isEmpty() || isSpecialBlockStart(currTrimmed)) {
+                            break
+                        }
+                        paragraphLines.add(currLine)
+                        i++
+                    }
+                    if (paragraphLines.isNotEmpty()) {
+                        blocks.add(MarkdownBlock.Paragraph(paragraphLines.joinToString("\n"), startIndex))
+                    }
                 }
             }
         }
+        parsedBlocksCache.put(cacheKey, blocks)
         return blocks
+    }
+
+    /**
+     * Comprueba si una línea inicia una entidad de bloque Markdown específica.
+     */
+    private fun isSpecialBlockStart(trimmed: String): Boolean {
+        return trimmed.startsWith("```") ||
+                trimmed == "---" || trimmed == "***" || trimmed == "___" ||
+                trimmed.startsWith("# ") || trimmed.startsWith("## ") || trimmed.startsWith("### ") ||
+                trimmed.startsWith(">") ||
+                trimmed.startsWith("- [ ] ") || trimmed.startsWith("- [x] ") || trimmed.startsWith("- [X] ") ||
+                trimmed.startsWith("* [ ] ") || trimmed.startsWith("* [x] ") || trimmed.startsWith("* [X] ") ||
+                trimmed.startsWith("- ") || trimmed.startsWith("* ") ||
+                Regex("^\\d+\\.\\s+.*").matches(trimmed)
     }
 
     /**

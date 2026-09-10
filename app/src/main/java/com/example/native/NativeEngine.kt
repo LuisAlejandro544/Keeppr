@@ -26,6 +26,13 @@ object NativeEngine {
     // Caché LRU de resúmenes de notas en memoria para evitar llamadas JNI repetidas durante el renderizado de listas
     private val summaryCache = android.util.LruCache<Int, NoteSummary>(200)
 
+    /**
+     * Limpia la memoria de la caché de resúmenes de notas cuando se cierran sesiones o se libera RAM.
+     */
+    fun clearSummaryCache() {
+        summaryCache.evictAll()
+    }
+
     fun getEngineInfo(): String {
         return if (isLoaded) {
             try {
