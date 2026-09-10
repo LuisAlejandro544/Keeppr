@@ -1,6 +1,16 @@
-fix(proguard): corregir sintaxis de assumenosideeffects para java.lang.Throwable en r8
+feat(beta): proteccion bucles lua, permiso instalacion apk y paquete com.keeppr.beta
 
-- Corrección de Parseo en R8 / ProGuard (`app/proguard-rules.pro`):
-  * Añadida la palabra clave `class` faltante en la regla de poda de trazas de pila: `-assumenosideeffects class java.lang.Throwable { public void printStackTrace(); }`.
-  * Resuelve el fallo de compilación en GitHub Actions (`minifyReleaseWithR8 FAILED: Expected [!]interface|@interface|class|enum`).
-  * Permite a R8 minificar y compilar exitosamente la variante de producción Release sin errores de sintaxis.
+- Protección contra bucles infinitos en Lua 5.4 (`app/src/main/cpp/native-bridge.cpp`):
+  * Implementado hook de conteo de instrucciones (`lua_sethook` con `LUA_MASKCOUNT` a 100,000 instrucciones).
+  * Aborta de forma segura cualquier script de usuario con bucle infinito mediante `luaL_error`, evitando bloqueos en el hilo principal y eventos ANR.
+
+- Pulido de permiso de instalación in-app (`REQUEST_INSTALL_PACKAGES`):
+  * Implementada función de verificación `canRequestPackageInstalls` en `AppUpdateManager.kt`.
+  * Añadida notificación visual guiada (Toast e indicador en `SettingsDialog.kt`) para activar "Permitir desde esta fuente" en Android 8.0+ antes de invocar el instalador del sistema.
+
+- Nomenclatura del paquete de aplicación para la versión Beta (`app/build.gradle.kts`):
+  * Configurado `applicationId = "com.keeppr"` en `defaultConfig` y `applicationIdSuffix = ".beta"` en `buildTypes.release`, resultando en `com.keeppr.beta` para el canal Beta.
+  * Sincronizado nombre y metadatos con `metadata.json` ("Keeppr Beta") y `README.md`.
+
+- Coherencia técnica en documentación y base de datos:
+  * Corregida referencia en `Changelog-beta.md` y `AppDatabase.kt` para reflejar la implementación real del motor criptográfico nativo en Rust (`AES-256-CBC` con `PBKDF2-HMAC-SHA256`).

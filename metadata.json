@@ -1,6 +1,6 @@
 {
-  "name": "Keeppr",
-  "description": "Keeppr - Aplicación de notas moderna y potente combinando Markdown estilo Obsidian, bloques visuales y motor de cifrado nativo.",
+  "name": "Keeppr Beta",
+  "description": "Keeppr Beta - Aplicación de notas moderna y potente combinando Markdown estilo Obsidian, bloques visuales y motor de cifrado nativo.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

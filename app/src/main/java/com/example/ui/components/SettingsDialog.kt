@@ -543,6 +543,13 @@ fun SettingsDialog(
                     }
 
                     is UpdateStatus.ReadyToInstall -> {
+                        val context = androidx.compose.ui.platform.LocalContext.current
+                        val canInstallPackages = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            context.packageManager.canRequestPackageInstalls()
+                        } else {
+                            true
+                        }
+
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
@@ -573,6 +580,15 @@ fun SettingsDialog(
                                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                                 )
 
+                                if (!canInstallPackages) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = "Nota: Al pulsar, el sistema te solicitará activar 'Permitir desde esta fuente' para completar la instalación sin salir de Keeppr.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.9f)
+                                    )
+                                }
+
                                 Spacer(modifier = Modifier.height(12.dp))
                                 Button(
                                     onClick = { onInstallApk(updateStatus.apkFile) },
@@ -586,7 +602,7 @@ fun SettingsDialog(
                                         modifier = Modifier.size(18.dp)
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Instalar Actualización Ahora")
+                                    Text(if (canInstallPackages) "Instalar Actualización Ahora" else "Conceder Permiso e Instalar")
                                 }
                             }
                         }

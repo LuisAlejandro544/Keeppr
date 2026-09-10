@@ -68,7 +68,7 @@ Keeppr es una aplicación móvil de notas personales de alto rendimiento, diseñ
 * **Poda de Dependencias No Utilizadas:** Removidas del empaquetado de producción librerías no requeridas (`Retrofit`, `Moshi`, interceptor de logs y generadores KSP asociados).
 * **Purga de Idiomas en `resources.arsc`:** Configurado `resourceConfigurations += listOf("es", "en")`, eliminando más de 75 idiomas no soportados inyectados por dependencias externas y reduciendo significativamente la tabla de recursos.
 * **Exclusión de Metadatos de Desarrollo:** Bloqueada la inclusión de `META-INF/*.kotlin_module` y metadatos de compilación en el paquete final.
-* **Nota de Bienvenida Oficial y Única:** Sustitución de notas de demostración por una única nota de bienvenida explicativa que detalla el uso del editor Markdown, checklists interactivas, cifrado AES-256-GCM / Argon2id, automatizaciones Lua y funcionamiento 100% local.
+* **Nota de Bienvenida Oficial y Única:** Sustitución de notas de demostración por una única nota de bienvenida explicativa que detalla el uso del editor Markdown, checklists interactivas, cifrado nativo AES-256-CBC / PBKDF2-HMAC-SHA256, automatizaciones Lua y funcionamiento 100% local.
 
 ---
 

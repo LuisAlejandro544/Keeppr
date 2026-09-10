@@ -87,7 +87,7 @@ abstract class AppDatabase : RoomDatabase() {
 
 ### 🔒 3. Cifrado y Privacidad de Notas
 - Protege notas confidenciales asignando una contraseña individual desde el menú superior del editor.
-- Seguridad de alto nivel impulsada por el núcleo nativo (**AES-256-GCM** con derivación de claves **Argon2id**).
+- Seguridad de alto nivel impulsada por el núcleo nativo (**AES-256-CBC** con derivación de claves **PBKDF2-HMAC-SHA256**).
 
 ### 🔍 4. Búsqueda y Organización Rápida
 - Busca al instante por título, contenido o etiquetas con filtrado acelerado por **Rust nativo**.

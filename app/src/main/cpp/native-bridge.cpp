@@ -49,6 +49,12 @@ Java_com_example_native_NativeEngine_getNativeInfo(
     return env->NewStringUTF(oss.str().c_str());
 }
 
+// Hook de seguridad de Lua para prevenir bucles infinitos y bloqueos en el hilo principal (ANR).
+// Interrumpe la ejecución de forma segura mediante luaL_error si el script excede 100,000 instrucciones.
+static void lua_timeout_instruction_hook(lua_State* L, lua_Debug* /* ar */) {
+    luaL_error(L, "Tiempo de ejecución excedido (límite de 100,000 instrucciones alcanzado para prevenir bucles infinitos)");
+}
+
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_example_native_NativeEngine_executeLua(
         JNIEnv* env,
@@ -69,6 +75,9 @@ Java_com_example_native_NativeEngine_executeLua(
     }
 
     luaL_openlibs(L);
+
+    // Protección nativa contra bucles infinitos: hook de conteo que aborta de forma segura
+    lua_sethook(L, lua_timeout_instruction_hook, LUA_MASKCOUNT, 100000);
 
     std::string result;
     int status = luaL_dostring(L, nativeScript);
@@ -115,6 +124,9 @@ Java_com_example_native_NativeEngine_executeLuaWithContext(
     }
 
     luaL_openlibs(L);
+
+    // Protección nativa contra bucles infinitos: hook de conteo que aborta de forma segura
+    lua_sethook(L, lua_timeout_instruction_hook, LUA_MASKCOUNT, 100000);
 
     // Inyectar de forma segura las variables globales 'content' y 'title' para el script
     if (content != nullptr) {

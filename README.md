@@ -6,7 +6,7 @@ Aplicación móvil de gestión segura de notas y apuntes de alto rendimiento, di
   * **Canary (Desarrollo / Debug):** "Keeppr Canary" (Versión: `v0.1.0-dev`). Incluye suite completa de depuración in-app y soporte de emuladores de PC (`x86_64`).
   * **Beta (Pre-Release / Release):** "Keeppr Beta" (Versión: `v0.1.0-b`). Versión de prueba comunitaria limpia, sin herramientas de depuración y optimizada descartando arquitecturas de emulador de PC.
   * **Estable (Producción Futura):** Se integrará más adelante en un flujo oficial definitivo tras consolidar la retroalimentación de la comunidad.
-- **Identificador de Paquete (Application ID):** `com.keeppr.notes` (almacenamiento en `Android/data/com.keeppr.notes`)
+- **Identificador de Paquete (Application ID):** `com.keeppr.beta` (Versión Beta: almacenamiento en `Android/data/com.keeppr.beta`)
 - **Identidad Visual / Icono:** Cuaderno de tapa dura personal con banda elástica vertical (estilo Moleskine) en formato WebP de máxima calidad y alta compresión (`ic_keeppr_logo.webp`), integrado como icono adaptativo Android sobre paleta oscura y acentos cálidos.
 - **Registro de Capacidades Beta:** Consultar `Changelog-beta.md` para el desglose completo de novedades de la versión.
 

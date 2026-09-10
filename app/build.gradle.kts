@@ -10,7 +10,7 @@ android {
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
   defaultConfig {
-    applicationId = "com.keeppr.notes"
+    applicationId = "com.keeppr"
     minSdk = 26
     targetSdk = 36
     versionCode = 1
@@ -63,6 +63,7 @@ android {
 
   buildTypes {
     release {
+      applicationIdSuffix = ".beta"
       versionNameSuffix = "-b"
       resValue("string", "app_name", "Keeppr Beta")
       ndk {
@@ -82,6 +83,7 @@ android {
       signingConfig = signingConfigs.getByName("release")
     }
     debug {
+      applicationIdSuffix = ".dev"
       versionNameSuffix = "-dev"
       resValue("string", "app_name", "Keeppr Canary")
       ndk {

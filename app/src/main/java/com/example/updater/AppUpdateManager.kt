@@ -318,6 +318,17 @@ class AppUpdateManager(private val context: Context) {
     }
 
     /**
+     * Comprueba si la aplicación tiene autorización del sistema operativo para solicitar instalaciones de APK.
+     */
+    fun canRequestPackageInstalls(context: Context): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.packageManager.canRequestPackageInstalls()
+        } else {
+            true
+        }
+    }
+
+    /**
      * Inicia la instalación del archivo APK descargado a través del instalador de paquetes
      * nativo de Android sin salir a navegadores externos.
      */
@@ -332,6 +343,12 @@ class AppUpdateManager(private val context: Context) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val canInstall = activityContext.packageManager.canRequestPackageInstalls()
                 if (!canInstall) {
+                    android.widget.Toast.makeText(
+                        activityContext,
+                        "Activa 'Permitir desde esta fuente' para que Keeppr pueda instalar la actualización",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+
                     val settingsIntent = Intent(
                         Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
                         Uri.parse("package:${activityContext.packageName}")
